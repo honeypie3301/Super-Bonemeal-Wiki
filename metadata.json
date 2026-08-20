@@ -1,0 +1,6 @@
+{
+  "name": "Super Bone Meal Wiki",
+  "description": "Official Wiki and Interactive Documentation for the Super Bone Meal Minecraft Mod (NeoForge 1.21.1)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
