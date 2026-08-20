@@ -98,10 +98,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={onStatsClick}
-              className="w-10 h-10 rounded-md bg-[#24111d] border border-[#52213f] flex items-center justify-center text-[#f472b6] font-serif font-bold text-lg hover:bg-[#321729] transition-colors cursor-pointer"
+              className="w-10 h-10 rounded-md bg-[#24111d] border border-[#52213f] flex items-center justify-center text-[#f472b6] font-serif font-bold text-lg hover:bg-[#321729] transition-colors cursor-pointer overflow-hidden relative"
               title="View Mod Specifications"
             >
-              S
+              <img
+                src="./logo.png"
+                alt="Logo"
+                className="w-full h-full object-cover relative z-10"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+              <span className="absolute inset-0 flex items-center justify-center">S</span>
             </button>
             <a href="#/wiki/home" className="flex flex-col text-left" onClick={onClose}>
               <h1 className="font-serif font-bold text-[#fce7f3] tracking-wider text-sm hover:text-[#f472b6] transition-colors uppercase">

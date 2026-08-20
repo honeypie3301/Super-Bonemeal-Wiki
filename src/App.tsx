@@ -86,9 +86,17 @@ export default function App() {
 
             <button
               onClick={() => setIsStatsOpen(true)}
-              className="w-8 h-8 rounded-md bg-[#24111d] border border-[#52213f] font-serif font-bold text-xs text-[#f472b6] flex items-center justify-center"
+              className="w-8 h-8 rounded-md bg-[#24111d] border border-[#52213f] font-serif font-bold text-xs text-[#f472b6] flex items-center justify-center overflow-hidden relative"
             >
-              S
+              <img
+                src="./logo.png"
+                alt="Logo"
+                className="w-full h-full object-cover relative z-10"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+              <span className="absolute inset-0 flex items-center justify-center">S</span>
             </button>
           </header>
 
