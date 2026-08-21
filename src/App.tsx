@@ -250,7 +250,7 @@ function WikiContainer() {
         <div className="animate-pulse flex flex-col items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-[#1f1019] border-2 border-[#521f3d] flex items-center justify-center shadow-[0_0_24px_rgba(244,114,182,0.25)] relative overflow-hidden">
             <img 
-              src="/logo.png" 
+              src="./logo.png" 
               alt="Super Bone Meal Logo"
               className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(244,114,182,0.5)]"
               onError={(e) => {
@@ -327,7 +327,7 @@ function WikiContainer() {
             title="View Terminal Stats"
             id="header-b-icon"
           >
-            <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" />
+            <img src="./logo.png" alt="Logo" className="w-full h-full object-contain" />
           </button>
         </header>
 

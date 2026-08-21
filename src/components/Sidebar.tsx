@@ -101,7 +101,7 @@ export default function Sidebar({
               title="View Terminal Stats"
               id="sidebar-b-icon"
             >
-              <img src="/logo.png" alt="Super Bone Meal Logo" className="w-full h-full object-contain" />
+              <img src="./logo.png" alt="Super Bone Meal Logo" className="w-full h-full object-contain" />
             </button>
             <a href="#/wiki/home" className="flex flex-col text-left" onClick={onClose}>
               <h1 className="font-serif font-bold text-[#fce7f3] tracking-wide text-sm hover:text-[#f9a8d4] transition-colors">

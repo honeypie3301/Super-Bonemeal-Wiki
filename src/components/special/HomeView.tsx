@@ -28,7 +28,7 @@ export default function HomeView() {
       <UpdatedFrame id="home_hero_dial_picker" isUpdated={true}>
         <div className="relative overflow-hidden rounded-xl bg-[#120c10] border border-[#2b1723] p-4 sm:p-8 text-center shadow-lg space-y-3 flex flex-col items-center justify-center">
           <img 
-            src="/logo.png" 
+            src="./logo.png" 
             alt="Super Bone Meal Logo" 
             className="w-16 h-16 sm:w-20 sm:h-20 object-contain drop-shadow-[0_0_20px_rgba(244,114,182,0.4)] transition-transform hover:scale-105"
           />
