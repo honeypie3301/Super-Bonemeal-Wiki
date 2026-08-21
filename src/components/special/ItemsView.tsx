@@ -97,7 +97,10 @@ export default function ItemsView() {
         { label: "Smart Filter", value: "Skips Short Grass (Prevents Tall Grass clutter)" },
         { label: "Particle Burst", value: "100–200 Happy Villager Particles" },
         { label: "Stack Limit", value: "64 Items" },
-        { label: "Survival Consumption", value: "Consumes 1 item per use (Infinite in Creative)" },
+        { label: "Crafting Recipe Yield", value: "4 Bone Blocks + 5 Bone Meal → 2 Super Bone Meal" },
+        { label: "Archaeology Brushing", value: "10% Chance (0–3 Items)" },
+        { label: "Structure Chest Loot", value: "~6% Chance (1–5 Items)" },
+        { label: "Fishing Gameplay Loot", value: "25% Chance (1–2 Items)" },
         { label: "Wandering Trader Trade", value: "2 Emeralds → 1 Super Bone Meal (Max 4)" },
         { label: "Farmer Villager Trade", value: "1 Emerald → 2 Super Bone Meal (Apprentice Lvl 2)" }
       ],
@@ -105,6 +108,7 @@ export default function ItemsView() {
         "Precision Growth Strike: Right-clicking directly onto saplings (#minecraft:saplings, #c:saplings), crops (#minecraft:crops), moss blocks, sugar cane, or bamboo applies 10 consecutive growth bursts in a single tick, instantly forcing full maturity or tree growth.",
         "50x50 Terrain Fertilization: Right-clicking open terrain scans a 50x2x50 area around the player, generating wildflowers and vegetation on dirt and grass surfaces.",
         "Smart Meadow Filter: The procedure checks whether a target block is already Short Grass; if so, it skips it to prevent chaotic clutter into Tall Grass, maintaining a clean and aesthetically pleasing meadow.",
+        "Natural Loot Drops (v1.4.0): Super Bone Meal now naturally generates in Archaeology suspicious sand/gravel (10% chance, 0-3 count), structure chests (~6% chance, 1-5 count), and fishing catches (25% chance, 1-2 count).",
         "Trading Integration: Legitimate Survival acquisition is fully supported through wandering traders (2 Emeralds for 1 Super Bone Meal) and Level 2 apprentice farmer villagers (1 Emerald for 2 Super Bone Meal)."
       ]
     },
@@ -407,6 +411,53 @@ export default function ItemsView() {
                     </div>
                   );
                 })()}
+              </div>
+            </UpdatedFrame>
+
+            {/* DEDICATED LOOT TABLES BREAKDOWN CARD (v1.4.0) */}
+            <UpdatedFrame id="loot_tables_v140_card" isUpdated={true}>
+              <div className="p-4 sm:p-5 bg-[#140c12] border border-[#36172a] rounded-xl space-y-3 shadow-md relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-3 border-b border-[#281320]">
+                  <div className="flex items-center gap-2">
+                    <Box className="w-4 h-4 text-[#f472b6]" />
+                    <h4 className="font-serif text-sm font-bold text-[#fce7f3]">Loot Tables & World Drops (v1.4.0)</h4>
+                  </div>
+                  <span className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 bg-[#25101e] text-[#f9a8d4] border border-[#4d1f3b] rounded">
+                    Wilderness Loot
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                  {/* Archaeology */}
+                  <div className="p-3 bg-[#0a0508] border border-[#24111d] rounded-lg space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center justify-between text-[#f9a8d4] font-bold text-xs">
+                      <span>Archaeology</span>
+                      <span className="text-[9px] bg-[#1d0e17] px-1.5 py-0.5 border border-[#3b1c2e] rounded text-emerald-400">10% Chance</span>
+                    </div>
+                    <p className="text-[10px] text-[#a88a96] leading-tight">Brushing suspicious sand or gravel blocks in archaeological dig sites.</p>
+                    <div className="text-[10px] text-amber-300 font-bold">Yield: 0–3 Super Bone Meal</div>
+                  </div>
+
+                  {/* Structure Chests */}
+                  <div className="p-3 bg-[#0a0508] border border-[#24111d] rounded-lg space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center justify-between text-[#f9a8d4] font-bold text-xs">
+                      <span>Chests</span>
+                      <span className="text-[9px] bg-[#1d0e17] px-1.5 py-0.5 border border-[#3b1c2e] rounded text-sky-400">~6% Chance</span>
+                    </div>
+                    <p className="text-[10px] text-[#a88a96] leading-tight">Naturally generated loot chests inside dungeons, villages, and ancient structures.</p>
+                    <div className="text-[10px] text-amber-300 font-bold">Yield: 1–5 Super Bone Meal</div>
+                  </div>
+
+                  {/* Fishing */}
+                  <div className="p-3 bg-[#0a0508] border border-[#24111d] rounded-lg space-y-1.5 font-mono text-[11px]">
+                    <div className="flex items-center justify-between text-[#f9a8d4] font-bold text-xs">
+                      <span>Fishing</span>
+                      <span className="text-[9px] bg-[#1d0e17] px-1.5 py-0.5 border border-[#3b1c2e] rounded text-pink-400">25% Chance</span>
+                    </div>
+                    <p className="text-[10px] text-[#a88a96] leading-tight">Reeling in catches during fishing gameplay across ocean, river, and pond biomes.</p>
+                    <div className="text-[10px] text-amber-300 font-bold">Yield: 1–2 Super Bone Meal</div>
+                  </div>
+                </div>
               </div>
             </UpdatedFrame>
 

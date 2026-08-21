@@ -8,13 +8,13 @@
       "keyMap": null,
       "ingredients": [
         "minecraft:bone_block",
-        "super_bonemeal:super_bonemeal",
+        "minecraft:bone_meal",
         "minecraft:bone_block",
-        "super_bonemeal:super_bonemeal",
-        "super_bonemeal:super_bonemeal",
-        "super_bonemeal:super_bonemeal",
+        "minecraft:bone_meal",
+        "minecraft:bone_meal",
+        "minecraft:bone_meal",
         "minecraft:bone_block",
-        "super_bonemeal:super_bonemeal",
+        "minecraft:bone_meal",
         "minecraft:bone_block"
       ]
     }

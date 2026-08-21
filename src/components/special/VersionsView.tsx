@@ -36,6 +36,46 @@ interface FallbackVersion {
 
 const fallbackVersions: FallbackVersion[] = [
   {
+    version: "Super Bone Meal v1.4.0",
+    tag: "v1.4.0",
+    date: "2026-08-21",
+    status: "release",
+    loaders: ["NeoForge", "Forge"],
+    gameVersions: ["1.21.1", "1.20.6"],
+    highlights: [
+      {
+        title: "Loot Table Integration",
+        description: "Added Super Bone Meal drops to Archaeology brushing (10% chance, 0-3 items), Structure Chests (~6% chance, 1-5 items), and Fishing gameplay loot (25% chance, 1-2 items).",
+        icon: <Sparkles className="w-4 h-4 text-[#f472b6]" />
+      },
+      {
+        title: "Crafting Recipe Rebalance",
+        description: "Updated the crafting recipe to require 4 Bone Blocks and 5 Vanilla Bone Meals, yielding 2 Super Bone Meals.",
+        icon: <Layers className="w-4 h-4 text-[#f9a8d4]" />
+      },
+      {
+        title: "Branding & Metadata Polish",
+        description: "Added official high-resolution mod logo and updated NeoForge metadata.",
+        icon: <CheckCircle className="w-4 h-4 text-[#f472b6]" />
+      }
+    ]
+  },
+  {
+    version: "Super Bone Meal v1.3.4",
+    tag: "v1.3.4",
+    date: "2026-08-20",
+    status: "release",
+    loaders: ["NeoForge"],
+    gameVersions: ["1.21.1"],
+    highlights: [
+      {
+        title: "Trading System Integration",
+        description: "Added dedicated survival trading mechanisms with Wandering Traders (2 Emeralds → 1 Super Bone Meal) and Level 2 Apprentice Farmer Villagers (1 Emerald → 2 Super Bone Meal).",
+        icon: <Sparkles className="w-4 h-4 text-[#f472b6]" />
+      }
+    ]
+  },
+  {
     version: "Super Bone Meal v1.2.0",
     tag: "v1.2.0",
     date: "2024-11-20",

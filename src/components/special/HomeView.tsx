@@ -35,7 +35,7 @@ export default function HomeView() {
       </UpdatedFrame>
 
       {/* 2. WIKI MAINTENANCE NOTE (UPDATED FRAME) */}
-      <UpdatedFrame id="home_maintenance_notice" isUpdated={true}>
+      <UpdatedFrame id="home_maintenance_notice_v140" isUpdated={true}>
         <div className="p-5 bg-gradient-to-r from-[#1f1019] via-[#140b10] to-[#10080d] border border-pink-500/40 rounded-xl space-y-3 shadow-lg">
           <div className="flex items-center gap-2 text-pink-400 font-mono text-xs uppercase font-bold tracking-wider">
             <Info className="w-4 h-4 text-pink-400 animate-pulse" />
@@ -47,10 +47,11 @@ export default function HomeView() {
           </div>
 
           <div className="text-xs text-[#d1b0c1] space-y-1.5 font-mono pt-1">
-            <div className="text-[#f9a8d4] font-semibold uppercase text-[11px] tracking-wider">Recent Highlights:</div>
+            <div className="text-[#f9a8d4] font-semibold uppercase text-[11px] tracking-wider">Recent Highlights (v1.4.0 Update):</div>
             <ul className="list-disc list-inside space-y-1.5 text-[#c4adb7] pl-1">
-              <li><strong className="text-pink-300">Wandering Trader Trades:</strong> Wandering Traders now offer Super Bone Meal for purchase (exchange 2 Emeralds for 1 Super Bone Meal, up to 4 trades per trader).</li>
-              <li><strong className="text-pink-300">Farmer Villager Trades:</strong> Level 2 (Apprentice) Farmer Villagers now trade 2 Super Bone Meal for 1 Emerald (up to 10 trades per apprentice farmer).</li>
+              <li><strong className="text-pink-300">Archaeology, Chest & Fishing Loot Tables:</strong> Super Bone Meal can now be found natively via Archaeology brushing (10% chance, 0–3 items), Structure Chests (~6% chance, 1–5 items), and Fishing gameplay loot (25% chance, 1–2 items).</li>
+              <li><strong className="text-pink-300">Standardized Crafting Recipe:</strong> Crafting recipe updated to combine 4 Bone Blocks (corners) + 5 Vanilla Bone Meals to yield 2 Super Bone Meal items.</li>
+              <li><strong className="text-pink-300">Villager & Wandering Trader Economy:</strong> Preserved Wandering Trader (2 Emeralds → 1) and Apprentice Farmer (1 Emerald → 2) trading options.</li>
             </ul>
           </div>
         </div>
