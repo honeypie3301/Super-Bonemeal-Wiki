@@ -4,7 +4,7 @@ import { Zap, Layers, CheckCircle, Code } from 'lucide-react';
 
 export const MechanicsView: React.FC = () => {
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-8 w-full">
       {/* Breadcrumb Header */}
       <div className="text-[10px] font-mono tracking-widest text-[#8c607a] uppercase flex items-center gap-2">
         <span>WIKI</span>
@@ -31,7 +31,7 @@ export const MechanicsView: React.FC = () => {
               When right-clicking directly on a block that matches saplings, crops, moss, or snow plants, the procedure executes an intensive 10-iteration loop calling <code className="text-[#f472b6]">BoneMealItem.growCrop()</code> or <code className="text-[#f472b6]">growWaterPlant()</code>.
             </p>
 
-            <div className="p-4 rounded-xl bg-[#130b10] border border-[#261420] space-y-2 text-xs font-mono">
+            <div className="p-6 sm:p-8 rounded-xl bg-[#130b10] border border-[#261420] space-y-2 text-xs font-mono">
               <span className="text-[10px] text-[#f472b6] uppercase font-bold flex items-center gap-1">
                 <CheckCircle className="w-3.5 h-3.5" /> Tag Compatibility List
               </span>
@@ -65,7 +65,7 @@ export const MechanicsView: React.FC = () => {
               When right-clicking on any standard block (such as grass, dirt, stone, or sand), the mod triggers 200 Happy Villager green particle bursts and executes a 3D bounding box loop:
             </p>
 
-            <div className="p-4 rounded-xl bg-[#130b10] border border-[#261420] space-y-2 font-mono text-xs">
+            <div className="p-6 sm:p-8 rounded-xl bg-[#130b10] border border-[#261420] space-y-2 font-mono text-xs">
               <div className="flex items-center justify-between text-[#8c607a] text-[10px] pb-1 border-b border-[#2e1726]">
                 <span>Bounding Box Calculation</span>
                 <span className="text-[#f472b6] font-bold">50 x 2 x 50 Blocks</span>
@@ -82,7 +82,7 @@ export const MechanicsView: React.FC = () => {
           </div>
 
           {/* Source Code Snippet */}
-          <div className="p-4 rounded-xl bg-[#0d080b] border border-[#261420] space-y-2">
+          <div className="p-6 sm:p-8 rounded-xl bg-[#0d080b] border border-[#261420] space-y-2">
             <div className="flex items-center gap-2 text-xs font-mono text-[#8c607a]">
               <Code className="w-4 h-4 text-[#f472b6]" />
               <span>SuperBonemealRightclickedOnBlockProcedure.java Snippet</span>

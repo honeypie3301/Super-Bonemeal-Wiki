@@ -10,7 +10,7 @@ export const FancyRecipeView: React.FC<FancyRecipeViewProps> = ({ recipe }) => {
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
   return (
-    <div className="my-4 p-4 sm:p-5 rounded-xl bg-[#0d070b] border border-[#261420] font-sans">
+    <div className="my-4 p-6 sm:p-8 rounded-xl bg-[#0d070b] border border-[#261420] font-sans">
       {/* Top Header Row */}
       <div className="flex items-start justify-between pb-2">
         <div>

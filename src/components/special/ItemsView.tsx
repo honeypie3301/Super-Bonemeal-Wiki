@@ -6,7 +6,7 @@ import { Zap, Compass, Tag } from 'lucide-react';
 
 export const ItemsView: React.FC = () => {
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-8 w-full">
       {/* Breadcrumb Header */}
       <div className="text-[10px] font-mono tracking-widest text-[#8c607a] uppercase flex items-center gap-2">
         <span>WIKI</span>
@@ -24,7 +24,7 @@ export const ItemsView: React.FC = () => {
       <UpdatedFrame id="item_super_bonemeal_frame">
         <div className="space-y-6">
           {/* Main Item Header Card */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-xl bg-[#180d14] border border-[#2e1726]">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 sm:p-8 rounded-xl bg-[#180d14] border border-[#2e1726]">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-xl bg-[#2b1422] border border-[#52213f] flex items-center justify-center shrink-0">
                 <span className="font-mono text-base font-bold text-[#f472b6]">SBM</span>

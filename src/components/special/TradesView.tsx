@@ -6,7 +6,7 @@ import { ShoppingBag } from 'lucide-react';
 
 export const TradesView: React.FC = () => {
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-8 w-full">
       {/* Breadcrumb Header */}
       <div className="text-[10px] font-mono tracking-widest text-[#8c607a] uppercase flex items-center gap-2">
         <span>WIKI</span>
@@ -29,7 +29,7 @@ export const TradesView: React.FC = () => {
 
           <TradeView trades={TRADES_DATA} />
 
-          <div className="p-4 rounded-xl bg-[#130b10] border border-[#261420] space-y-2 text-xs font-mono">
+          <div className="p-6 sm:p-8 rounded-xl bg-[#130b10] border border-[#261420] space-y-2 text-xs font-mono">
             <h3 className="font-bold text-[#fce7f3] flex items-center gap-2">
               <ShoppingBag className="w-4 h-4 text-[#f472b6]" />
               Trading Strategy Tips

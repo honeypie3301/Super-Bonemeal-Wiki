@@ -12,7 +12,7 @@ export const TradeView: React.FC<TradeViewProps> = ({ trades }) => {
       {trades.map((trade, idx) => (
         <div
           key={idx}
-          className="p-5 rounded-xl bg-[#130b10] border border-[#2e1726]"
+          className="p-6 sm:p-8 rounded-xl bg-[#130b10] border border-[#2e1726]"
         >
           {/* Header */}
           <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#2e1726]">

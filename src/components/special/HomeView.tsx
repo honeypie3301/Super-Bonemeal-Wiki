@@ -7,7 +7,7 @@ interface HomeViewProps {
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
   return (
-    <div className="space-y-4 sm:space-y-5 w-full">
+    <div className="space-y-8 w-full">
       {/* Breadcrumb Header */}
       <div className="text-[10px] font-mono tracking-widest text-[#8c607a] uppercase flex items-center gap-2">
         <span>WIKI</span>
@@ -23,17 +23,17 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
       </h1>
 
       {/* Center Banner Frame */}
-      <div className="bg-[#140b11] border border-[#2e1726] rounded-xl p-6 sm:p-10 text-center my-4 space-y-2">
-        <h2 className="font-serif font-bold text-2xl sm:text-4xl text-[#fce7f3] tracking-wider uppercase">
+      <div className="bg-[#140b11] border border-[#2e1726] rounded-xl p-8 text-center space-y-2">
+        <h2 className="font-serif text-4xl sm:text-5xl font-extrabold tracking-widest uppercase text-[#fce7f3]">
           SUPER BONE MEAL
         </h2>
-        <p className="font-mono text-xs text-[#a88098] tracking-widest uppercase">
+        <p className="text-xs sm:text-sm font-mono tracking-[0.2em] uppercase text-[#a88098]">
           OFFICIAL SURVIVAL & FARMING FIELD GUIDE
         </p>
       </div>
 
       {/* Mandatory Wiki Maintenance Notice Box */}
-      <div className="border border-amber-900/60 bg-[#160d13] p-4 sm:p-5 rounded-xl text-xs space-y-3">
+      <div className="border border-amber-900/60 bg-[#160d13] p-6 sm:p-8 rounded-xl text-xs space-y-3">
         <div className="flex items-center gap-2 font-mono font-bold text-amber-400 tracking-wider uppercase text-xs">
           <Info className="w-4 h-4 shrink-0 text-amber-400" />
           <span>WIKI MAINTENANCE NOTE</span>
@@ -73,7 +73,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
         <div
           onClick={() => onNavigate('mechanics_aoe')}
-          className="p-5 rounded-xl bg-[#140b11] border border-[#2e1726] hover:border-[#f472b6]/50 transition-colors cursor-pointer space-y-2 group"
+          className="p-6 sm:p-8 rounded-xl bg-[#140b11] border border-[#2e1726] hover:border-[#f472b6]/50 transition-colors cursor-pointer space-y-2 group"
         >
           <div className="w-8 h-8 rounded-md bg-[#24111d] border border-[#52213f] flex items-center justify-center text-[#f472b6]">
             <Zap className="w-4 h-4" />
@@ -89,7 +89,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
 
         <div
           onClick={() => onNavigate('items')}
-          className="p-5 rounded-xl bg-[#140b11] border border-[#2e1726] hover:border-[#f472b6]/50 transition-colors cursor-pointer space-y-2 group"
+          className="p-6 sm:p-8 rounded-xl bg-[#140b11] border border-[#2e1726] hover:border-[#f472b6]/50 transition-colors cursor-pointer space-y-2 group"
         >
           <div className="w-8 h-8 rounded-md bg-[#24111d] border border-[#52213f] flex items-center justify-center text-[#f472b6]">
             <Sparkles className="w-4 h-4" />
@@ -105,7 +105,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
 
         <div
           onClick={() => onNavigate('villager_trades')}
-          className="p-5 rounded-xl bg-[#140b11] border border-[#2e1726] hover:border-[#f472b6]/50 transition-colors cursor-pointer space-y-2 group"
+          className="p-6 sm:p-8 rounded-xl bg-[#140b11] border border-[#2e1726] hover:border-[#f472b6]/50 transition-colors cursor-pointer space-y-2 group"
         >
           <div className="w-8 h-8 rounded-md bg-[#24111d] border border-[#52213f] flex items-center justify-center text-[#f472b6]">
             <UserCheck className="w-4 h-4" />

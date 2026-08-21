@@ -102,7 +102,7 @@ export default function App() {
 
           {/* Article Render Stage */}
           <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto w-full">
-            <div className="w-full max-w-4xl mx-auto">
+            <div className="w-full max-w-[1000px] mx-auto space-y-8">
               {renderActiveView()}
             </div>
           </main>

@@ -108,7 +108,7 @@ export const VersionsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-8 w-full">
       {/* Breadcrumb Header */}
       <div className="text-[10px] font-mono tracking-widest text-[#8c607a] uppercase flex items-center gap-2">
         <span>WIKI</span>
@@ -178,7 +178,7 @@ export const VersionsView: React.FC = () => {
               {versions.map(ver => (
                 <div
                   key={ver.id}
-                  className="p-5 rounded-xl bg-[#140b11] border border-[#2e1726] space-y-3 font-mono"
+                  className="p-6 sm:p-8 rounded-xl bg-[#140b11] border border-[#2e1726] space-y-3 font-mono"
                 >
                   {/* Item Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#261420]">
