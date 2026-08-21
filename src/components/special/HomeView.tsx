@@ -7,7 +7,7 @@ interface HomeViewProps {
 
 export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
   return (
-    <div className="space-y-6 w-full">
+    <div className="space-y-4 sm:space-y-5 w-full">
       {/* Breadcrumb Header */}
       <div className="text-[10px] font-mono tracking-widest text-[#8c607a] uppercase flex items-center gap-2">
         <span>WIKI</span>
@@ -18,16 +18,16 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
       </div>
 
       {/* Article Title */}
-      <h1 className="font-serif font-bold text-4xl sm:text-5xl text-[#fce7f3] tracking-tight">
+      <h1 className="font-serif font-bold text-3xl sm:text-4xl text-[#fce7f3] tracking-tight">
         Home
       </h1>
 
       {/* Center Banner Frame */}
-      <div className="bg-[#140b11] border border-[#2e1726] rounded-xl p-8 sm:p-12 text-center my-6 space-y-3">
-        <h2 className="font-serif font-bold text-3xl sm:text-5xl text-[#fce7f3] tracking-wider uppercase">
+      <div className="bg-[#140b11] border border-[#2e1726] rounded-xl p-6 sm:p-10 text-center my-4 space-y-2">
+        <h2 className="font-serif font-bold text-2xl sm:text-4xl text-[#fce7f3] tracking-wider uppercase">
           SUPER BONE MEAL
         </h2>
-        <p className="font-mono text-xs sm:text-sm text-[#a88098] tracking-widest uppercase">
+        <p className="font-mono text-xs text-[#a88098] tracking-widest uppercase">
           OFFICIAL SURVIVAL & FARMING FIELD GUIDE
         </p>
       </div>
