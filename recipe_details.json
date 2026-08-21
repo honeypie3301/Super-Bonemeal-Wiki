@@ -1,0 +1,22 @@
+{
+  "super_bonemeal:super_bonemeal": [
+    {
+      "file": "super_bonemeal_recipe.json",
+      "type": "minecraft:crafting_shapeless",
+      "outputCount": 2,
+      "pattern": null,
+      "keyMap": null,
+      "ingredients": [
+        "minecraft:bone_block",
+        "super_bonemeal:super_bonemeal",
+        "minecraft:bone_block",
+        "super_bonemeal:super_bonemeal",
+        "super_bonemeal:super_bonemeal",
+        "super_bonemeal:super_bonemeal",
+        "minecraft:bone_block",
+        "super_bonemeal:super_bonemeal",
+        "minecraft:bone_block"
+      ]
+    }
+  ]
+}

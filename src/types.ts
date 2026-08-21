@@ -1,46 +1,45 @@
-export interface WikiArticle {
+export interface ManifestItem {
   slug: string;
+  filename?: string;
   title: string;
   category: string;
   order: number;
-  description: string;
-  isUpdated?: boolean;
+  content?: string;
 }
 
-export interface RecipeSlot {
-  code: string; // e.g. "Bb" or "Sbm"
-  name: string; // e.g. "Bone Block"
-  bgColor?: string; // custom slot color if needed
-  textColor?: string;
+export type WikiArticle = ManifestItem;
+
+export interface Article extends ManifestItem {
+  content: string;
 }
 
-export interface RecipeSpec {
-  id: string;
-  type: 'CRAFTING SHAPED' | 'CRAFTING SHAPELESS';
+export interface Achievement {
   title: string;
-  yieldCount: number;
-  recipeNumber?: string;
-  recipeFile: string;
-  grid: (RecipeSlot | null)[]; // 9 slots
-  output: RecipeSlot & { count: number };
-  ingredientsList: { key: string; name: string }[];
+  description: string;
+  requirement: string;
+  completed: boolean;
 }
 
-export interface TradeSpec {
-  profession: string;
-  level: number;
-  levelTitle: string;
-  cost: {
-    item: string;
-    count: number;
-    icon: string;
+export interface DimensionNode {
+  id: string;
+  name: string;
+  description: string;
+  requirements?: string;
+  biomes?: string[];
+  color: string;
+  borderColor: string;
+}
+
+export interface EntityModel {
+  id: string;
+  name: string;
+  objFile: string;
+  mtlFile: string;
+  skinFile: string;
+  description: string;
+  stats: {
+    health: string;
+    behavior: string;
+    spawning: string;
   };
-  result: {
-    item: string;
-    count: number;
-    icon: string;
-  };
-  maxTrades: number;
-  xpGain: number;
-  priceMultiplier: number;
 }

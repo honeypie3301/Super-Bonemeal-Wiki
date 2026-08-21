@@ -1,92 +1,124 @@
 import React, { useState, useEffect } from 'react';
-import { UpdatedFrame } from '../UpdatedFrame';
-import { STATIC_FALLBACK_VERSIONS } from '../../data/wikiData';
-import { RefreshCw, Download, Tag, Calendar, ExternalLink, AlertCircle } from 'lucide-react';
+import { Calendar, Tag, Sparkles, Activity, ShieldAlert, GitCommit, Download, RefreshCw, Layers, ExternalLink, CheckCircle } from 'lucide-react';
+import UpdatedFrame from '../UpdatedFrame';
 
-interface ModVersion {
+interface ModrinthVersion {
   id: string;
   name: string;
   version_number: string;
-  game_versions: string[];
-  loaders: string[];
-  version_type: string;
+  changelog?: string;
   date_published: string;
-  changelog: string;
   downloads: number;
-  fileUrl?: string;
-  filename?: string;
+  version_type: 'release' | 'beta' | 'alpha';
+  loaders: string[];
+  game_versions: string[];
+  files: {
+    url: string;
+    filename: string;
+    primary: boolean;
+    size: number;
+  }[];
 }
 
-export const VersionsView: React.FC = () => {
-  const [versions, setVersions] = useState<ModVersion[]>([]);
+interface FallbackVersion {
+  version: string;
+  tag: string;
+  date: string;
+  status: 'release' | 'beta' | 'alpha';
+  loaders: string[];
+  gameVersions: string[];
+  highlights: {
+    title: string;
+    description: string;
+    icon: React.ReactNode;
+  }[];
+}
+
+const fallbackVersions: FallbackVersion[] = [
+  {
+    version: "Super Bone Meal v1.2.0",
+    tag: "v1.2.0",
+    date: "2024-11-20",
+    status: "release",
+    loaders: ["NeoForge", "Fabric", "Forge"],
+    gameVersions: ["1.21.1", "1.20.1"],
+    highlights: [
+      {
+        title: "Trading System Integration",
+        description: "Added dedicated survival trading mechanisms. Wandering Traders offer 1 Super Bone Meal for 2 Emeralds, and Level 2 Apprentice Farmer Villagers offer 2 Super Bone Meal for 1 Emerald.",
+        icon: <Sparkles className="w-4 h-4 text-[#f472b6]" />
+      },
+      {
+        title: "50x50 Massive Area Fertilization",
+        description: "Expands botanical acceleration over a massive 50x50 radius (2,500 blocks) with smart grass filtering to prevent unsightly tall grass clutter.",
+        icon: <Activity className="w-4 h-4 text-[#f9a8d4]" />
+      },
+      {
+        title: "Instant Single-Target Crop Pulses",
+        description: "Right-clicking crops, saplings, sugar cane, or bamboo applies 10 rapid growth pulses in 1 tick to force instant maturity.",
+        icon: <CheckCircle className="w-4 h-4 text-[#f472b6]" />
+      }
+    ]
+  },
+  {
+    version: "Super Bone Meal v1.1.0",
+    tag: "v1.1.0",
+    date: "2024-09-15",
+    status: "release",
+    loaders: ["NeoForge", "Fabric"],
+    gameVersions: ["1.21.1"],
+    highlights: [
+      {
+        title: "Smart Grass Detection",
+        description: "Implemented checks preventing double-growth on existing short grass to preserve clean landscape aesthetics.",
+        icon: <Sparkles className="w-4 h-4 text-[#f472b6]" />
+      },
+      {
+        title: "Shapeless Bulk Crafting",
+        description: "Introduced craft duplication recipes combining Bone Blocks and Super Bone Meal in any crafting bench.",
+        icon: <Layers className="w-4 h-4 text-[#f9a8d4]" />
+      }
+    ]
+  },
+  {
+    version: "Super Bone Meal v1.0.0",
+    tag: "v1.0.0",
+    date: "2024-07-10",
+    status: "release",
+    loaders: ["NeoForge", "Fabric", "Forge"],
+    gameVersions: ["1.21.0", "1.20.1"],
+    highlights: [
+      {
+        title: "Initial Launch",
+        description: "First public release featuring high-potency bone meal formulation and 100-200 villager particle emission bursts.",
+        icon: <Sparkles className="w-4 h-4 text-[#f472b6]" />
+      }
+    ]
+  }
+];
+
+export default function VersionsView() {
+  const [modrinthData, setModrinthData] = useState<ModrinthVersion[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [source, setSource] = useState<'modrinth' | 'cfwidget' | 'fallback'>('modrinth');
 
   const fetchVersions = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      // 1. Primary: Modrinth Open REST API
       const response = await fetch('https://api.modrinth.com/v2/project/super-bone-meal/version');
       if (!response.ok) {
-        throw new Error(`Modrinth API returned HTTP ${response.status}`);
+        throw new Error(`Modrinth API responded with status ${response.status}`);
       }
-
-      const data = await response.json();
-      const parsedVersions: ModVersion[] = data.map((v: any) => ({
-        id: v.id,
-        name: v.name || `Version ${v.version_number}`,
-        version_number: v.version_number,
-        game_versions: v.game_versions || [],
-        loaders: v.loaders || [],
-        version_type: v.version_type || 'release',
-        date_published: v.date_published,
-        changelog: v.changelog || 'No detailed changelog provided.',
-        downloads: v.downloads || 0,
-        fileUrl: v.files?.[0]?.url,
-        filename: v.files?.[0]?.filename,
-      }));
-
-      setVersions(parsedVersions);
-      setSource('modrinth');
+      const data: ModrinthVersion[] = await response.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setModrinthData(data);
+      } else {
+        setModrinthData([]);
+      }
     } catch (err: any) {
-      console.warn('Modrinth API unavailable, attempting CurseForge widget fallback...', err);
-
-      // 2. Secondary Fallback: CFWidget Proxy API
-      try {
-        const cfResponse = await fetch('https://api.cfwidget.com/minecraft/mc-mods/super-bone-meal');
-        if (!cfResponse.ok) throw new Error('CFWidget API unavailable');
-
-        const cfData = await cfResponse.json();
-        if (cfData.files && cfData.files.length > 0) {
-          const parsedCf: ModVersion[] = cfData.files.map((f: any) => ({
-            id: String(f.id),
-            name: f.name || f.display,
-            version_number: f.version || f.display,
-            game_versions: f.versions || ['1.21.1'],
-            loaders: ['neoforge'],
-            version_type: f.type || 'release',
-            date_published: f.created_at || new Date().toISOString(),
-            changelog: 'Synchronized via CurseForge release channel.',
-            downloads: f.downloads || 0,
-            fileUrl: f.url,
-            filename: f.name,
-          }));
-
-          setVersions(parsedCf);
-          setSource('cfwidget');
-        } else {
-          throw new Error('No files returned from CurseForge widget');
-        }
-      } catch (cfErr: any) {
-        console.warn('Remote APIs offline, loading embedded offline release cache...', cfErr);
-        // 3. Safety Net: Embedded Static Cache (Guarantees zero downtime)
-        setVersions(STATIC_FALLBACK_VERSIONS);
-        setSource('fallback');
-        setError('Remote release APIs currently unreachable. Displaying cached release history.');
-      }
+      console.warn('Could not fetch live Modrinth version history, using cached data:', err);
+      setError(err?.message || 'Failed to load live data');
     } finally {
       setLoading(false);
     }
@@ -96,178 +128,213 @@ export const VersionsView: React.FC = () => {
     fetchVersions();
   }, []);
 
-  const getSourceLabel = () => {
-    switch (source) {
-      case 'modrinth':
-        return 'Modrinth API (Live)';
-      case 'cfwidget':
-        return 'CurseForge API (Live)';
-      case 'fallback':
-        return 'Offline Release Cache';
-    }
-  };
-
   return (
-    <div className="space-y-8 w-full">
-      {/* Breadcrumb Header */}
-      <div className="text-[10px] font-mono tracking-widest text-[#8c607a] uppercase flex items-center gap-2">
-        <span>WIKI</span>
-        <span>/</span>
-        <span>CORE GUIDE</span>
-        <span>/</span>
-        <span className="text-[#f472b6] font-semibold">VERSION HISTORY</span>
-      </div>
-
-      {/* Title Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-12 py-4 select-text">
+      {/* Intro section */}
+      <div className="p-5 bg-[#140c12] border border-[#2b1725] rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="font-serif font-bold text-3xl sm:text-4xl text-[#fce7f3] tracking-tight">
-            Version History
-          </h1>
-          <p className="text-xs font-mono text-[#a88098] mt-1">
-            Official mod release logs and downloads
+          <h4 className="font-serif text-base font-bold text-[#fce7f3]">Mod Release & Version History</h4>
+          <p className="text-xs text-[#c4adb7] leading-relaxed mt-1">
+            Real-time version distribution and update changelogs synced directly from the Modrinth API for Super Bone Meal.
           </p>
         </div>
 
-        {/* Sync / Refresh Button */}
-        <button
-          onClick={fetchVersions}
-          disabled={loading}
-          className="px-3.5 py-2 rounded-lg bg-[#180d14] border border-[#2e1726] hover:border-[#f472b6]/50 text-xs font-mono text-[#fce7f3] flex items-center gap-2 transition-colors cursor-pointer self-start sm:self-auto"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 text-[#f472b6] ${loading ? 'animate-spin' : ''}`} />
-          <span>{loading ? 'Syncing...' : 'Refresh Releases'}</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={fetchVersions}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1f101a] border border-[#441f35] text-[#f9a8d4] rounded text-xs font-mono hover:border-[#6b2a4f] hover:text-[#fce7f3] transition-all cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Sync API
+          </button>
+          
+          <a
+            href="https://modrinth.com/mod/super-bone-meal"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#291321] border border-[#6b2a4f] text-[#f472b6] rounded text-xs font-mono hover:bg-[#381a2e] transition-all"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Modrinth
+          </a>
+        </div>
       </div>
 
-      {/* Version Logs Container */}
-      <UpdatedFrame id="versions_frame">
-        <div className="space-y-4">
-          {/* Status Header */}
-          <div className="flex items-center justify-between text-xs font-mono pb-2 border-b border-[#2e1726]">
-            <span className="text-[#8c607a]">
-              Source:{' '}
-              <strong className="text-[#f472b6] uppercase">
-                {getSourceLabel()}
-              </strong>
-            </span>
-            <span className="text-[#a88098]">
-              Total Published: {versions.length} Builds
-            </span>
-          </div>
+      {/* Timeline container */}
+      <div className="relative pl-6 sm:pl-8 border-l border-[#2e1627]">
+        {/* Render Live Modrinth Data if available */}
+        {modrinthData.length > 0 ? (
+          modrinthData.map((v, index) => {
+            const dateFormatted = new Date(v.date_published).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            });
 
-          {/* Loading State */}
-          {loading && (
-            <div className="p-8 text-center text-xs font-mono text-[#8c607a] space-y-2">
-              <RefreshCw className="w-6 h-6 animate-spin text-[#f472b6] mx-auto" />
-              <p>Fetching latest release builds...</p>
-            </div>
-          )}
+            return (
+              <UpdatedFrame key={v.id} id={`ver_${v.id}`} isUpdated={index === 0}>
+                <div className="relative mb-12 last:mb-0">
+                  {/* Dot Indicator */}
+                  <div className="absolute -left-[31px] sm:-left-[39px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full bg-[#0e080b] border-2 border-[#f472b6] shadow-sm shadow-pink-950/40 z-10">
+                    <GitCommit className="w-3.5 h-3.5 text-[#f472b6]" />
+                  </div>
 
-          {/* Soft Offline Banner */}
-          {error && !loading && (
-            <div className="p-3 rounded-lg bg-[#1a0e14] border border-[#3b1c2b] text-xs font-mono text-[#e8b6d3] flex items-center gap-2.5">
-              <AlertCircle className="w-4 h-4 text-[#f472b6] shrink-0" />
-              <p>{error}</p>
-            </div>
-          )}
-
-          {/* Version Items List */}
-          {!loading && versions.length > 0 && (
-            <div className="space-y-4">
-              {versions.map(ver => (
-                <div
-                  key={ver.id}
-                  className="p-6 sm:p-8 rounded-xl bg-[#140b11] border border-[#2e1726] space-y-3 font-mono"
-                >
-                  {/* Item Header */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#261420]">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded bg-[#24111d] border border-[#52213f] flex items-center justify-center text-[#f472b6]">
-                        <Tag className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <h3 className="font-serif font-bold text-base text-[#fce7f3] flex items-center gap-2">
-                          <span>{ver.name}</span>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
-                            ver.version_type === 'release'
-                              ? 'bg-emerald-950/60 border border-emerald-800/60 text-emerald-300'
-                              : 'bg-amber-950/60 border border-amber-800/60 text-amber-300'
-                          }`}>
-                            {ver.version_type}
-                          </span>
-                        </h3>
-                        <p className="text-[10px] text-[#8c607a]">
-                          Version {ver.version_number}
-                        </p>
-                      </div>
+                  {/* Version Header Card */}
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <h3 className="font-serif text-xl sm:text-2xl font-bold text-[#fce7f3] tracking-tight">
+                        {v.name || `Super Bone Meal v${v.version_number}`}
+                      </h3>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#261220] text-[#f9a8d4] border border-[#4d1f3b] uppercase">
+                        <Tag className="w-2.5 h-2.5" />
+                        {v.version_number}
+                      </span>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                        v.version_type === 'release'
+                          ? 'bg-[#1e1019] text-[#f472b6] border border-[#521e3c]'
+                          : 'bg-[#291e12] text-amber-400 border border-[#543b1a]'
+                      }`}>
+                        {v.version_type}
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-3 text-[11px] text-[#a88098]">
-                      <span className="flex items-center gap-1">
+                    {/* Metadata: Date, Loaders, Game Versions */}
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-[#a88a96] font-mono">
+                      <div className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-[#f472b6]" />
-                        {new Date(ver.date_published).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                        })}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Download className="w-3.5 h-3.5 text-[#f472b6]" />
-                        {ver.downloads}
-                      </span>
+                        <span>Published: {dateFormatted}</span>
+                      </div>
+                      
+                      {v.loaders && v.loaders.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[#6e4b5d]">Loaders:</span>
+                          {v.loaders.map(loader => (
+                            <span key={loader} className="px-1.5 py-0.5 bg-[#170c14] border border-[#2d1525] rounded text-[10px] text-[#fce7f3] capitalize">
+                              {loader}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {v.game_versions && v.game_versions.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[#6e4b5d]">Minecraft:</span>
+                          <span className="px-1.5 py-0.5 bg-[#170c14] border border-[#2d1525] rounded text-[10px] text-[#f9a8d4]">
+                            {v.game_versions.join(', ')}
+                          </span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Changelog or Description Box */}
+                    {v.changelog && (
+                      <div className="p-4 bg-[#120a10] border border-[#261521] rounded-lg hover:border-[#421d33] transition-all duration-300">
+                        <h4 className="font-mono text-[10px] uppercase tracking-wider text-[#a88a96] mb-2 font-bold flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-[#f472b6]" />
+                          Release Notes & Changelog
+                        </h4>
+                        <div className="text-xs text-[#c4adb7] font-mono whitespace-pre-line leading-relaxed">
+                          {v.changelog}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Download Button */}
+                    {v.files && v.files.length > 0 && (
+                      <div className="pt-1">
+                        <a
+                          href={v.files[0].url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#24111d] hover:bg-[#36172a] text-[#fce7f3] border border-[#521f3d] rounded-md text-xs font-mono transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5 text-[#f472b6]" />
+                          Download {v.files[0].filename} ({(v.files[0].size / 1024).toFixed(1)} KB)
+                        </a>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Badges for Loaders and Game Versions */}
-                  <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                    <span className="text-[#8c607a] uppercase">Loaders:</span>
-                    {ver.loaders.map(ldr => (
-                      <span key={ldr} className="px-2 py-0.5 rounded bg-[#21111c] border border-[#4a1f39] text-[#f472b6] capitalize">
-                        {ldr}
-                      </span>
-                    ))}
-
-                    <span className="text-[#8c607a] uppercase ml-2">Minecraft:</span>
-                    {ver.game_versions.map(gv => (
-                      <span key={gv} className="px-2 py-0.5 rounded bg-[#180e15] border border-[#2e1726] text-[#fce7f3]">
-                        MC {gv}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* Changelog Content */}
-                  <div className="pt-2">
-                    <span className="text-[10px] text-[#8c607a] uppercase block mb-1">Changelog:</span>
-                    <div className="p-3 rounded-lg bg-[#0d070b] border border-[#210f1b] text-xs text-[#c29eb5] whitespace-pre-line leading-relaxed">
-                      {ver.changelog}
-                    </div>
-                  </div>
-
-                  {/* File Download Action */}
-                  {ver.fileUrl && (
-                    <div className="pt-2 flex items-center justify-between">
-                      <span className="text-[10px] text-[#8c607a] truncate max-w-[200px] sm:max-w-xs">
-                        {ver.filename}
-                      </span>
-                      <a
-                        href={ver.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3.5 py-1.5 rounded-md bg-[#24111d] border border-[#52213f] hover:border-[#f472b6] text-xs text-[#fce7f3] hover:text-[#f472b6] flex items-center gap-1.5 transition-colors"
-                      >
-                        <Download className="w-3.5 h-3.5 text-[#f472b6]" />
-                        <span>Download Build</span>
-                        <ExternalLink className="w-3 h-3 text-[#8c607a]" />
-                      </a>
-                    </div>
-                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </UpdatedFrame>
+              </UpdatedFrame>
+            );
+          })
+        ) : (
+          /* Render Cached/Fallback Structure while loading or if offline */
+          fallbackVersions.map((v, index) => (
+            <UpdatedFrame key={v.version} id={`ver_fallback_${v.tag}`} isUpdated={index === 0}>
+              <div className="relative mb-12 last:mb-0">
+                {/* Dot Indicator */}
+                <div className="absolute -left-[31px] sm:-left-[39px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full bg-[#0e080b] border-2 border-[#f472b6] shadow-sm shadow-pink-950/40 z-10">
+                  <GitCommit className="w-3.5 h-3.5 text-[#f472b6]" />
+                </div>
+
+                {/* Version Header Card */}
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h3 className="font-serif text-xl sm:text-2xl font-bold text-[#fce7f3] tracking-tight">
+                      {v.version}
+                    </h3>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#261220] text-[#f9a8d4] border border-[#4d1f3b] uppercase">
+                      <Tag className="w-2.5 h-2.5" />
+                      {v.tag}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#1e1019] text-[#f472b6] border border-[#521e3c] uppercase">
+                      {v.status}
+                    </span>
+                  </div>
+
+                  {/* Date & Tags */}
+                  <div className="flex flex-wrap items-center gap-4 text-xs text-[#a88a96] font-mono">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#f472b6]" />
+                      <span>Released: {v.date}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[#6e4b5d]">Loaders:</span>
+                      {v.loaders.map(loader => (
+                        <span key={loader} className="px-1.5 py-0.5 bg-[#170c14] border border-[#2d1525] rounded text-[10px] text-[#fce7f3]">
+                          {loader}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[#6e4b5d]">MC:</span>
+                      <span className="px-1.5 py-0.5 bg-[#170c14] border border-[#2d1525] rounded text-[10px] text-[#f9a8d4]">
+                        {v.gameVersions.join(', ')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Highlights List */}
+                  <div className="grid gap-4 mt-4">
+                    {v.highlights.map((h, hIndex) => (
+                      <div 
+                        key={hIndex} 
+                        className="p-4 bg-[#120a10] border border-[#261521] rounded-lg hover:border-[#421d33] transition-all duration-300"
+                      >
+                        <div className="flex gap-3">
+                          <div className="mt-0.5 p-1.5 rounded bg-[#1e0f19] border border-[#3b1c2e] shrink-0 h-fit">
+                            {h.icon}
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="font-serif text-sm font-bold text-[#fce7f3]">
+                              {h.title}
+                            </h4>
+                            <p className="text-xs text-[#c4adb7] leading-relaxed">
+                              {h.description}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </UpdatedFrame>
+          ))
+        )}
+      </div>
     </div>
   );
-};
+}

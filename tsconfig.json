@@ -23,6 +23,8 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["DummyWiki", "node_modules", "dist"]
+  "exclude": [
+    "dist",
+    "node_modules"
+  ]
 }

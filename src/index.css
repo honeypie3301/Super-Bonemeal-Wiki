@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
-/* Universal scrollbar styling for a consistent dark Super Bonemeal pink theme */
+/* Universal scrollbar styling for a consistent pastel pink dark theme */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2b1422 #0a0608;
+  scrollbar-color: #3b202c #0a0809;
 }
 
 /* Custom scrollbars for WebKit browsers (Chrome, Safari, Edge, etc.) */
@@ -13,17 +13,17 @@
 }
 
 *::-webkit-scrollbar-track {
-  background: #0a0608;
+  background: #0a0809;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: #2b1422;
+  background: #3b202c;
   border-radius: 4px;
-  border: 2px solid #0a0608;
+  border: 2px solid #0a0809;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #4a1f3b;
+  background: #5e2e44;
 }
 
 /* Slim scrollbar variation */
@@ -37,10 +37,10 @@
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #2b1422;
+  background: #3b202c;
   border-radius: 3px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: #4a1f3b;
+  background: #5e2e44;
 }
