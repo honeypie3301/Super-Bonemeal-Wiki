@@ -104,8 +104,8 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
     }
 
     try {
-      // 1. Listen to global stats doc
-      statsUnsubscribe = onSnapshot(doc(db, 'stats', 'global'), (statsDoc) => {
+      // 1. Listen to dedicated super bonemeal stats doc
+      statsUnsubscribe = onSnapshot(doc(db, 'stats', 'super_bonemeal'), (statsDoc) => {
         if (statsDoc.exists()) {
           const data = statsDoc.data();
           setStats(prev => ({
@@ -133,17 +133,21 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
         enableSandboxFallback();
       });
 
-      // 2. Listen to logs query
+      // 2. Listen to telemetry logs query
       const logsQuery = query(
         collection(db, 'telemetry_logs'),
         orderBy('timestamp', 'desc'),
-        limit(50)
+        limit(100)
       );
 
       logsUnsubscribe = onSnapshot(logsQuery, (snapshot) => {
         const logs: TelemetryLog[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
+          // Filter exclusively for Super Bone Meal wiki logs
+          if (data.wiki && data.wiki !== 'super_bonemeal') {
+            return;
+          }
           let tsStr = new Date().toISOString();
           if (data.timestamp) {
             if (typeof data.timestamp.toDate === 'function') {
@@ -168,12 +172,12 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
               repeatCount: 0,
               totalCount: 0,
               pageViews: {},
-              logs
+              logs: logs.slice(0, 50)
             };
           }
           return {
             ...prev,
-            logs
+            logs: logs.slice(0, 50)
           };
         });
       }, (err) => {

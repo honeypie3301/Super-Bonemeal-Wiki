@@ -108,12 +108,14 @@ function WikiContainer() {
         return false;
       }
       try {
-        const visitorDocRef = doc(firestoreDb, 'visitors', visitorId);
+        const fullVisitorKey = `bonemeal_${visitorId}`;
+        const visitorDocRef = doc(firestoreDb, 'visitors', fullVisitorKey);
         const visitorSnapshot = await getDoc(visitorDocRef);
         const isUnique = !visitorSnapshot.exists();
 
         if (isUnique) {
           await setDoc(visitorDocRef, {
+            wiki: 'super_bonemeal',
             firstVisit: serverTimestamp(),
             lastVisit: serverTimestamp()
           });
@@ -123,8 +125,9 @@ function WikiContainer() {
           }, { merge: true });
         }
 
-        const statsDocRef = doc(firestoreDb, 'stats', 'global');
+        const statsDocRef = doc(firestoreDb, 'stats', 'super_bonemeal');
         await setDoc(statsDocRef, {
+          wiki: 'super_bonemeal',
           totalCount: increment(1),
           uniqueCount: isUnique ? increment(1) : increment(0),
           repeatCount: !isUnique ? increment(1) : increment(0),
@@ -132,6 +135,7 @@ function WikiContainer() {
         }, { merge: true });
 
         await addDoc(collection(firestoreDb, 'telemetry_logs'), {
+          wiki: 'super_bonemeal',
           timestamp: serverTimestamp(),
           type: isUnique ? 'unique' : 'repeat',
           slug,
