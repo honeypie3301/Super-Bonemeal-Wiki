@@ -85,20 +85,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Container */}
       <aside
         className={`
-          fixed md:sticky top-0 left-0 z-40
-          w-64 h-screen
-          bg-[#0d080b] border-r border-[#261420]
-          flex flex-col
-          transition-transform duration-300 ease-out shrink-0
+          w-64 bg-[#0a0d0b] border-r border-[#1a221c] flex flex-col shrink-0 h-screen sticky top-0 z-30
+          fixed md:sticky left-0 transition-transform duration-300 ease-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
       >
         {/* Header Branding */}
-        <div className="p-4 border-b border-[#261420] flex items-center justify-between bg-[#130b10]">
+        <div className="p-4 border-b border-[#1a221c] flex items-center justify-between bg-[#0a0d0b]">
           <div className="flex items-center gap-3">
             <button
               onClick={onStatsClick}
-              className="w-10 h-10 rounded-md bg-[#24111d] border border-[#52213f] flex items-center justify-center text-[#f472b6] font-serif font-bold text-lg hover:bg-[#321729] transition-colors cursor-pointer overflow-hidden relative"
+              className="w-10 h-10 rounded-md bg-[#121814] border border-[#1a221c] flex items-center justify-center text-[#f472b6] font-serif font-bold text-lg hover:bg-[#1a221c] transition-colors cursor-pointer overflow-hidden relative"
               title="View Mod Specifications"
             >
               <img
@@ -122,14 +119,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="md:hidden p-1.5 rounded text-[#8c607a] hover:text-[#fce7f3] hover:bg-[#210f1a]"
+            className="md:hidden p-1.5 rounded text-[#8c607a] hover:text-[#fce7f3] hover:bg-[#1a221c]"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Search Input */}
-        <div className="p-3 border-b border-[#261420] bg-[#0d080b]">
+        <div className="p-3 border-b border-[#1a221c] bg-[#0a0d0b]">
           <div className="relative">
             <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-[#8c607a]" />
             <input
@@ -137,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               placeholder="Search guide..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full bg-[#140a10] border border-[#2a1421] rounded-md py-1.5 pl-9 pr-8 text-xs text-[#fbcfe8] placeholder-[#8c607a] focus:outline-none focus:border-[#f472b6] transition-colors"
+              className="w-full bg-[#121814] border border-[#1a221c] rounded-md py-1.5 pl-9 pr-8 text-xs text-[#fbcfe8] placeholder-[#8c607a] focus:outline-none focus:border-[#f472b6] transition-colors"
             />
             {searchQuery && (
               <button
@@ -181,11 +178,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           href={`#/wiki/${art.slug}`}
                           onClick={onClose}
                           className={`
-                            group flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs transition-colors duration-150
+                            group flex items-center gap-2.5 px-3 py-2 text-xs sm:text-sm rounded-md transition-colors duration-150
                             ${
                               isActive
-                                ? 'bg-[#24111d] text-[#f472b6] font-medium border-l-2 border-[#f472b6]'
-                                : 'text-[#c29eb5] hover:text-[#fce7f3] hover:bg-[#180d14]'
+                                ? 'bg-[#1a221c] text-[#f472b6] font-medium border-l-2 border-[#f472b6]'
+                                : 'text-[#c29eb5] hover:text-[#fce7f3] hover:bg-[#121814]'
                             }
                           `}
                         >
