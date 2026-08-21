@@ -104,8 +104,8 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
     }
 
     try {
-      // 1. Listen to dedicated bonemeal stats doc
-      statsUnsubscribe = onSnapshot(doc(db, 'bonemeal_stats', 'global'), (statsDoc) => {
+      // 1. Listen to global stats doc
+      statsUnsubscribe = onSnapshot(doc(db, 'stats', 'global'), (statsDoc) => {
         if (statsDoc.exists()) {
           const data = statsDoc.data();
           setStats(prev => ({
@@ -133,9 +133,9 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
         enableSandboxFallback();
       });
 
-      // 2. Listen to dedicated bonemeal logs query
+      // 2. Listen to logs query
       const logsQuery = query(
-        collection(db, 'bonemeal_telemetry_logs'),
+        collection(db, 'telemetry_logs'),
         orderBy('timestamp', 'desc'),
         limit(50)
       );
