@@ -54,7 +54,7 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
 
     const enableSandboxFallback = () => {
       // Fallback to local storage
-      const localStatsStr = localStorage.getItem('local_wiki_stats');
+      const localStatsStr = localStorage.getItem('bonemeal_wiki_stats');
       if (localStatsStr) {
         try {
           setStats(JSON.parse(localStatsStr));
@@ -64,12 +64,12 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
         }
       } else {
         // Initialize default mock local stats
-        const localId = localStorage.getItem('wiki_visitor_id') || 'surv_local';
+        const localId = localStorage.getItem('bonemeal_visitor_id') || 'surv_local';
         const defaultStats = {
           uniqueCount: 16,
           repeatCount: 24,
           totalCount: 40,
-          pageViews: { 'home': 18, 'getting-started': 10, 'items': 8, 'versions': 4 },
+          pageViews: { 'home': 20, 'items': 14, 'versions': 6 },
           logs: [
             {
               timestamp: new Date().toISOString(),
@@ -80,18 +80,18 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
             {
               timestamp: new Date(Date.now() - 600000).toISOString(),
               type: 'repeat' as const,
-              slug: 'getting-started',
+              slug: 'items',
               visitorId: 'surv_f2910a'
             },
             {
               timestamp: new Date(Date.now() - 1800000).toISOString(),
               type: 'unique' as const,
-              slug: 'items',
+              slug: 'versions',
               visitorId: 'surv_f2910a'
             }
           ]
         };
-        localStorage.setItem('local_wiki_stats', JSON.stringify(defaultStats));
+        localStorage.setItem('bonemeal_wiki_stats', JSON.stringify(defaultStats));
         setStats(defaultStats);
         setIsSandbox(true);
       }
@@ -104,8 +104,8 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
     }
 
     try {
-      // 1. Listen to global stats doc
-      statsUnsubscribe = onSnapshot(doc(db, 'stats', 'global'), (statsDoc) => {
+      // 1. Listen to dedicated bonemeal stats doc
+      statsUnsubscribe = onSnapshot(doc(db, 'bonemeal_stats', 'global'), (statsDoc) => {
         if (statsDoc.exists()) {
           const data = statsDoc.data();
           setStats(prev => ({
@@ -133,9 +133,9 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
         enableSandboxFallback();
       });
 
-      // 2. Listen to logs query
+      // 2. Listen to dedicated bonemeal logs query
       const logsQuery = query(
-        collection(db, 'telemetry_logs'),
+        collection(db, 'bonemeal_telemetry_logs'),
         orderBy('timestamp', 'desc'),
         limit(50)
       );
@@ -195,7 +195,7 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
   const handleManualRefresh = () => {
     setIsRefreshing(true);
     if (isSandbox) {
-      const localStatsStr = localStorage.getItem('local_wiki_stats');
+      const localStatsStr = localStorage.getItem('bonemeal_wiki_stats');
       if (localStatsStr) {
         try {
           setStats(JSON.parse(localStatsStr));
@@ -249,7 +249,7 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
               <div className="flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-[#f472b6] animate-pulse" />
                 <span className="text-xs font-bold tracking-widest text-[#f9a8d4] uppercase flex items-center gap-2">
-                  WIKI TELEMETRY TERMINAL v1.0.9
+                  SUPER BONE MEAL TELEMETRY TERMINAL
                   {isSandbox && (
                     <span className="text-amber-400 text-[9px] px-1.5 py-0.5 bg-amber-950/40 border border-amber-900/40 rounded font-normal uppercase tracking-normal animate-pulse">
                       SANDBOX MODE

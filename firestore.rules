@@ -1,6 +1,19 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Super Bone Meal Telemetry Collections
+    match /bonemeal_visitors/{visitorId} {
+      allow read, write: if true;
+    }
+    match /bonemeal_stats/{docId} {
+      allow read, write: if true;
+    }
+    match /bonemeal_telemetry_logs/{logId} {
+      allow read, create: if true;
+      allow update, delete: if false;
+    }
+
+    // Legacy fallback matches
     match /visitors/{visitorId} {
       allow read, write: if true;
     }

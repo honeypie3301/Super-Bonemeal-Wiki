@@ -26,7 +26,7 @@ export default function UpdatedFrame({
   const [active, setActive] = useState<boolean>(() => {
     if (!isUpdated) return false;
     try {
-      const seen = localStorage.getItem(`backwoods_updated_seen_${id}`);
+      const seen = localStorage.getItem(`bonemeal_updated_seen_${id}`);
       return seen !== 'true';
     } catch (e) {
       return true;
@@ -62,7 +62,7 @@ export default function UpdatedFrame({
       const timer = setTimeout(() => {
         setActive(false);
         try {
-          localStorage.setItem(`backwoods_updated_seen_${id}`, 'true');
+          localStorage.setItem(`bonemeal_updated_seen_${id}`, 'true');
         } catch (e) {
           // Ignore quota / security error in restricted sandboxes
         }

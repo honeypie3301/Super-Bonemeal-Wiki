@@ -23,5 +23,5 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firestore with the custom database ID from env or fallback
 const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || "ai-studio-thebackwoodswiki-ac0523f9-a958-4030-9d0b-0b30a0bd2277";
 
-export const db = getFirestore(app, databaseId);
+export const db = databaseId ? getFirestore(app, databaseId) : getFirestore(app);
 

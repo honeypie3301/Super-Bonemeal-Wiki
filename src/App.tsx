@@ -51,7 +51,7 @@ function WikiContainer() {
   // Track page visits
   useEffect(() => {
     const recordLocalVisit = (slug: string, visitorId: string) => {
-      const localStatsStr = localStorage.getItem('local_wiki_stats');
+      const localStatsStr = localStorage.getItem('bonemeal_wiki_stats');
       let stats = {
         uniqueCount: 1,
         repeatCount: 0,
@@ -100,7 +100,7 @@ function WikiContainer() {
         }
       }
 
-      localStorage.setItem('local_wiki_stats', JSON.stringify(stats));
+      localStorage.setItem('bonemeal_wiki_stats', JSON.stringify(stats));
     };
 
     const recordVisitFirebase = async (slug: string, visitorId: string): Promise<boolean> => {
@@ -108,7 +108,7 @@ function WikiContainer() {
         return false;
       }
       try {
-        const visitorDocRef = doc(firestoreDb, 'visitors', visitorId);
+        const visitorDocRef = doc(firestoreDb, 'bonemeal_visitors', visitorId);
         const visitorSnapshot = await getDoc(visitorDocRef);
         const isUnique = !visitorSnapshot.exists();
 
@@ -123,7 +123,7 @@ function WikiContainer() {
           }, { merge: true });
         }
 
-        const statsDocRef = doc(firestoreDb, 'stats', 'global');
+        const statsDocRef = doc(firestoreDb, 'bonemeal_stats', 'global');
         await setDoc(statsDocRef, {
           totalCount: increment(1),
           uniqueCount: isUnique ? increment(1) : increment(0),
@@ -131,7 +131,7 @@ function WikiContainer() {
           [`pageViews.${slug}`]: increment(1)
         }, { merge: true });
 
-        await addDoc(collection(firestoreDb, 'telemetry_logs'), {
+        await addDoc(collection(firestoreDb, 'bonemeal_telemetry_logs'), {
           timestamp: serverTimestamp(),
           type: isUnique ? 'unique' : 'repeat',
           slug,
@@ -147,10 +147,10 @@ function WikiContainer() {
 
     const recordVisit = async () => {
       try {
-        let visitorId = localStorage.getItem('wiki_visitor_id');
+        let visitorId = localStorage.getItem('bonemeal_visitor_id');
         if (!visitorId) {
           visitorId = 'surv_' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
-          localStorage.setItem('wiki_visitor_id', visitorId);
+          localStorage.setItem('bonemeal_visitor_id', visitorId);
         }
 
         // Try Firebase first for real-time global telemetry
