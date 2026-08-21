@@ -18,22 +18,22 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
       </div>
 
       {/* Article Title */}
-      <h1 className="font-serif font-bold text-4xl sm:text-5xl text-[#fce7f3] tracking-tight">
+      <h1 className="font-serif font-bold text-3xl sm:text-4xl text-[#fce7f3] tracking-tight">
         Home
       </h1>
 
       {/* Center Banner Frame */}
-      <div className="bg-[#140b11] border border-[#2e1726] rounded-xl p-8 sm:p-12 text-center my-6 space-y-2">
-        <h2 className="font-serif font-bold text-3xl sm:text-5xl text-[#fce7f3] tracking-wider uppercase">
+      <div className="bg-[#140b11] border border-[#2e1726] rounded-xl p-6 sm:p-10 text-center my-4 space-y-2">
+        <h2 className="font-serif font-bold text-2xl sm:text-4xl text-[#fce7f3] tracking-wider uppercase">
           SUPER BONE MEAL
         </h2>
-        <p className="font-mono text-xs sm:text-sm text-[#a88098] tracking-widest uppercase">
+        <p className="font-mono text-xs text-[#a88098] tracking-widest uppercase">
           OFFICIAL SURVIVAL & FARMING FIELD GUIDE
         </p>
       </div>
 
       {/* Mandatory Wiki Maintenance Notice Box */}
-      <div className="border border-amber-900/60 bg-[#160d13] p-5 sm:p-6 rounded-xl text-xs space-y-3">
+      <div className="border border-amber-900/60 bg-[#160d13] p-4 sm:p-5 rounded-xl text-xs space-y-3">
         <div className="flex items-center gap-2 font-mono font-bold text-amber-400 tracking-wider uppercase text-xs">
           <Info className="w-4 h-4 shrink-0 text-amber-400" />
           <span>WIKI MAINTENANCE NOTE</span>
@@ -55,7 +55,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
               <li className="flex items-start gap-2">
                 <span className="text-[#f472b6] font-bold">•</span>
                 <span>
-                  <strong className="text-[#fce7f3]">Shapeless Recipe:</strong> Craft 2 Super Bone Meal using 9 Bone Blocks in a 3x3 crafting grid.
+                  <strong className="text-[#fce7f3]">Shaped Recipe:</strong> Craft 2 Super Bone Meal using 5 Bone Meal in a plus shape and 4 Bone Blocks in the corners of a 3x3 grid.
                 </span>
               </li>
               <li className="flex items-start gap-2">
@@ -99,7 +99,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ onNavigate }) => {
             <ArrowRight className="w-3.5 h-3.5 text-[#8c607a] group-hover:text-[#f472b6] transition-colors" />
           </h3>
           <p className="text-xs text-[#a88098] leading-relaxed">
-            Crafted with 9 Bone Blocks in a standard 3x3 grid to yield 2 Super Bone Meal.
+            Crafted with 5 Bone Meal and 4 Bone Blocks in a 3x3 grid to yield 2 Super Bone Meal.
           </p>
         </div>
 

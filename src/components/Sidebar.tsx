@@ -86,7 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         className={`
           fixed md:sticky top-0 left-0 z-40
-          w-[270px] h-screen
+          w-[260px] h-screen
           bg-[#0d080b] border-r border-[#261420]
           flex flex-col
           transition-transform duration-300 ease-out shrink-0
