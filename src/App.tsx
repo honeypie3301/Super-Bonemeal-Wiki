@@ -56,9 +56,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#060806] text-[#c9d1c9] flex flex-col font-sans selection:bg-[#2d4a34] selection:text-[#e0e7e0]">
-      {/* Main 2-column flex body wrapper */}
-      <div className="flex flex-1 w-full relative">
+    <div className="min-h-screen w-full bg-[#0a0608] text-[#fce7f3] flex flex-col font-sans selection:bg-pink-900 selection:text-pink-100">
+      {/* Main Layout Container (Fluid Screen Width) */}
+      <div className="flex-1 flex w-full">
         {/* Sidebar Navigation */}
         <Sidebar
           articles={WIKI_ARTICLES}
@@ -68,13 +68,13 @@ export default function App() {
           onStatsClick={() => setIsStatsOpen(true)}
         />
 
-        {/* Main Content Viewport Wrapper */}
-        <main className="flex-1 min-w-0 flex flex-col min-h-screen bg-[#060806] overflow-x-hidden">
+        {/* Main Content Viewport */}
+        <div className="flex-1 flex flex-col min-w-0 w-full">
           {/* Top Header Bar for Mobile / Tablet */}
-          <header className="md:hidden sticky top-0 z-30 bg-[#0a0d0b] border-b border-[#1a221c] p-4 flex items-center justify-between">
+          <header className="md:hidden sticky top-0 z-30 bg-[#130b10] border-b border-[#261420] p-4 flex items-center justify-between">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="p-2 rounded-lg bg-[#121814] border border-[#1a221c] text-[#c9d1c9] hover:bg-[#1a221c] transition-colors"
+              className="p-2 rounded-lg bg-[#180d14] border border-[#2e1726] text-[#fce7f3] hover:bg-[#210f1a] transition-colors"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -86,7 +86,7 @@ export default function App() {
 
             <button
               onClick={() => setIsStatsOpen(true)}
-              className="w-8 h-8 rounded-md bg-[#1a221c] border border-[#2a382e] font-serif font-bold text-xs text-[#f472b6] flex items-center justify-center overflow-hidden relative"
+              className="w-8 h-8 rounded-md bg-[#24111d] border border-[#52213f] font-serif font-bold text-xs text-[#f472b6] flex items-center justify-center overflow-hidden relative"
             >
               <img
                 src="./logo.png"
@@ -100,11 +100,13 @@ export default function App() {
             </button>
           </header>
 
-          {/* Inner Padded Page Container */}
-          <div className="flex-1 p-4 sm:p-6 md:p-8 lg:p-12 w-full max-w-[1000px] mx-auto space-y-8">
-            {renderActiveView()}
-          </div>
-        </main>
+          {/* Article Render Stage */}
+          <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto w-full">
+            <div className="w-full max-w-[1000px] mx-auto space-y-8">
+              {renderActiveView()}
+            </div>
+          </main>
+        </div>
       </div>
 
       {/* Terminal Stats Modal */}

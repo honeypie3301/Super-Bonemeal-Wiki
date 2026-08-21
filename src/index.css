@@ -1,15 +1,46 @@
 @import "tailwindcss";
 
-@theme {
-  --font-serif: 'Cinzel', Georgia, serif;
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+/* Universal scrollbar styling for a consistent dark Super Bonemeal pink theme */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2b1422 #0a0608;
 }
 
-@layer base {
-  body {
-    font-family: var(--font-sans);
-    background-color: #060806;
-    color: #c9d1c9;
-  }
+/* Custom scrollbars for WebKit browsers (Chrome, Safari, Edge, etc.) */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #0a0608;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #2b1422;
+  border-radius: 4px;
+  border: 2px solid #0a0608;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #4a1f3b;
+}
+
+/* Slim scrollbar variation */
+.scrollbar-thin {
+  scrollbar-width: thin;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #2b1422;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #4a1f3b;
 }
