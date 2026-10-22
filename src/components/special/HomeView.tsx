@@ -42,24 +42,24 @@ export default function HomeView() {
 
       {/* 2. WIKI MAINTENANCE NOTE (UPDATED FRAME) */}
       <UpdatedFrame id="home_maintenance_notice_v140_verified" isUpdated={true}>
-        <div className="p-5 bg-gradient-to-r from-[#211a13] via-[#19140f] to-[#120f0b] border border-[#8c7355]/50 rounded-xl space-y-3 shadow-lg">
-          <div className="flex items-center gap-2 text-[#dfc9ab] font-mono text-xs uppercase font-bold tracking-wider">
-            <Info className="w-4 h-4 text-[#dfc9ab] animate-pulse" />
+        <div className="p-5 bg-gradient-to-r from-[#17140b] via-[#0f110d] to-[#0c0e0c] border border-amber-500/40 rounded-xl space-y-3 shadow-lg">
+          <div className="flex items-center gap-2 text-amber-400 font-mono text-xs uppercase font-bold tracking-wider">
+            <Info className="w-4 h-4 text-amber-400 animate-pulse" />
             <span>Wiki Maintenance Note</span>
           </div>
           
-          <div className="p-3 bg-[#2a2118]/70 border border-[#6b5842]/50 rounded-lg text-[#fbf7f0] text-sm font-medium leading-relaxed">
-            <u>The wiki is always updated before a new version releases.</u> If something in-game doesn't match what's documented here, please make sure your mod build is up to date.
+          <div className="p-4 sm:p-5 bg-amber-950/30 border border-amber-500/30 rounded-lg text-amber-200 text-base sm:text-lg md:text-xl font-semibold leading-relaxed text-center flex items-center justify-center">
+            <u>The wiki is always updated before a new version releases.</u>
           </div>
 
           <div className="text-xs text-[#cfc2ae] space-y-1.5 font-mono pt-1">
-            <div className="text-[#dfc9ab] font-semibold uppercase text-[11px] tracking-wider">Recent Highlights (v1.4.0):</div>
+            <div className="text-amber-400 font-semibold uppercase text-[11px] tracking-wider">Recent Highlights (v1.4.0):</div>
             <ul className="list-disc list-inside space-y-1.5 text-[#b8a994] pl-1">
-              <li><strong className="text-[#f7f3ea]">Loot Tables:</strong> Added drops in Archaeology (10% chance, 0–3 items), Chests (6% chance, 1–5 items), and Fishing (25% chance, 1–2 items).</li>
-              <li><strong className="text-[#f7f3ea]">Shapeless Crafting Recipe:</strong> 4 Bone Blocks + 5 Bone Meals in any crafting layout yields 2 Super Bone Meals.</li>
-              <li><strong className="text-[#f7f3ea]">Targeted Plant Growth:</strong> Right-clicking moss blocks (<code className="text-[#dfc9ab]">Blocks.MOSS_BLOCK</code>), saplings (<code className="text-[#dfc9ab]">#minecraft:saplings</code>, <code className="text-[#dfc9ab]">#c:saplings</code>), crops (<code className="text-[#dfc9ab]">#minecraft:crops</code>), or snow plants (<code className="text-[#dfc9ab]">#snowrealmagic:plants</code>) applies 10 bone meal growth calls in 1 tick.</li>
-              <li><strong className="text-[#f7f3ea]">Area Fertilization:</strong> Right-clicking other blocks runs a 50x2x50 volume check with a 10% chance per non-short grass block.</li>
-              <li><strong className="text-[#f7f3ea]">Villager & Wandering Trader Trades:</strong> Wandering Trader offers 1 Super Bone Meal for 2 Emeralds (max 4). Apprentice Farmer offers 2 Super Bone Meals for 1 Emerald (max 10).</li>
+              <li><strong className="text-amber-300">Loot Tables:</strong> Added drops in Archaeology (10% chance, 0–3 items), Chests (6% chance, 1–5 items), and Fishing (25% chance, 1–2 items).</li>
+              <li><strong className="text-amber-300">Shapeless Crafting Recipe:</strong> 4 Bone Blocks + 5 Bone Meals in any crafting layout yields 2 Super Bone Meals.</li>
+              <li><strong className="text-amber-300">Targeted Plant Growth:</strong> Right-clicking moss blocks (<code className="text-amber-200 bg-amber-950/40 px-1 py-0.5 rounded border border-amber-500/20">Blocks.MOSS_BLOCK</code>), saplings (<code className="text-amber-200 bg-amber-950/40 px-1 py-0.5 rounded border border-amber-500/20">#minecraft:saplings</code>, <code className="text-amber-200 bg-amber-950/40 px-1 py-0.5 rounded border border-amber-500/20">#c:saplings</code>), crops (<code className="text-amber-200 bg-amber-950/40 px-1 py-0.5 rounded border border-amber-500/20">#minecraft:crops</code>), or snow plants (<code className="text-amber-200 bg-amber-950/40 px-1 py-0.5 rounded border border-amber-500/20">#snowrealmagic:plants</code>) applies 10 bone meal growth calls in 1 tick.</li>
+              <li><strong className="text-amber-300">Area Fertilization:</strong> Right-clicking other blocks runs a 50x2x50 volume check with a 10% chance per non-short grass block.</li>
+              <li><strong className="text-amber-300">Villager & Wandering Trader Trades:</strong> Wandering Trader offers 1 Super Bone Meal for 2 Emeralds (max 4). Apprentice Farmer offers 2 Super Bone Meals for 1 Emerald (max 10).</li>
             </ul>
           </div>
         </div>

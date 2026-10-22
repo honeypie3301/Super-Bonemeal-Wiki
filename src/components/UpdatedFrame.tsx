@@ -46,7 +46,7 @@ export default function UpdatedFrame({
           setIsVisible(true);
         }
       },
-      { threshold: 0.2 }
+      { threshold: 0 }
     );
 
     if (containerRef.current) {
@@ -77,13 +77,13 @@ export default function UpdatedFrame({
       ref={containerRef}
       className={`relative transition-all duration-700 ${
         active
-          ? 'z-20 border border-[#d4b28c]/60 shadow-[0_0_15px_rgba(212,178,140,0.3)] rounded-xl'
+          ? 'z-20 border border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.25)] rounded-xl'
           : ''
       } ${className}`}
     >
       {active && (
-        <div className="absolute top-2.5 right-2.5 z-30 bg-[#dfc9ab] text-[#14100c] font-mono text-[9px] font-bold px-2 py-0.5 rounded-full border border-[#fbf7f0]/60 shadow-sm uppercase tracking-wider flex items-center gap-1 pointer-events-none select-none">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#8c7355]" />
+        <div className="absolute top-2.5 right-2.5 z-30 bg-amber-500/90 text-[#0f110d] font-mono text-[9px] font-bold px-2 py-0.5 rounded-full border border-amber-300/40 shadow-sm uppercase tracking-wider flex items-center gap-1 pointer-events-none select-none">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-200" />
           <span>{badgeLabel}</span>
           <span className="text-[8px] opacity-75 font-normal">(7s)</span>
         </div>

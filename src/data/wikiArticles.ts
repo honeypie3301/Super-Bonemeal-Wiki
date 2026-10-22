@@ -33,9 +33,9 @@ Official documentation for the Super Bone Meal Minecraft mod (version 1.4.0 for 
 <UpdatedFrame id="home_maintenance_notice_v140_verified" isUpdated={true}>
 > **Wiki Maintenance Note**
 > 
-> <u>The wiki is always updated before a new version releases.</u> If something in-game doesn't match what's documented here, please make sure your mod build is up to date.
+> <u>The wiki is always updated before a new version releases.</u>
 > 
-> **Recent Highlights:**
+> **Recent Highlights (v1.4.0):**
 > - **Loot Tables**: Added loot table injections for archaeology (10% chance, 0–3 items), chests (6% chance, 1–5 items), and fishing (25% chance, 1–2 items).
 > - **Crafting Recipe**: Shapeless recipe requiring 4 Bone Blocks and 5 Bone Meals to yield 2 Super Bone Meals.
 > - **Targeted Plant Growth**: Right-clicking Moss Blocks, saplings (#minecraft:saplings, #c:saplings), crops (#minecraft:crops), or Snow! Real Magic! plants (#snowrealmagic:plants) applies 10 bone meal growth calls in 1 tick.
