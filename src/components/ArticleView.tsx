@@ -121,7 +121,7 @@ export default function ArticleView({
       const escapedQuery = searchQuery.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       try {
         const queryRegex = new RegExp(`(?<!<[^>]*)\\b(${escapedQuery})\\b`, 'gi');
-        parsed = parsed.replace(queryRegex, match => `<mark class="bg-pink-950/80 text-pink-200 px-0.5 rounded border border-pink-800/40">${match}</mark>`);
+        parsed = parsed.replace(queryRegex, match => `<mark class="bg-[#2a2118] text-[#fbf7f0] px-0.5 rounded border border-[#8c7355]/60">${match}</mark>`);
       } catch (e) {
         // Fallback if lookbehind is not supported or regex fails
       }
@@ -202,9 +202,9 @@ export default function ArticleView({
     <div className="relative min-h-screen flex flex-col lg:flex-row gap-8 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-8">
       
       {/* Reading Progress Bar (top of the page) */}
-      <div className="fixed top-0 left-0 right-0 h-[3px] bg-pink-950/20 z-50 pointer-events-none">
+      <div className="fixed top-0 left-0 right-0 h-[3px] bg-[#2a2118]/40 z-50 pointer-events-none">
         <div 
-          className="h-full bg-gradient-to-r from-pink-500 to-[#f472b6] transition-all duration-75"
+          className="h-full bg-gradient-to-r from-[#8c7355] to-[#dfc9ab] transition-all duration-75"
           style={{ width: `${readingProgress}%` }}
         />
       </div>
@@ -213,17 +213,17 @@ export default function ArticleView({
       <div className="flex-1 min-w-0">
         
         {/* Navigation Breadcrumb */}
-        <div className="flex items-center gap-2 text-[11px] font-mono text-[#a88a96] uppercase tracking-wider mb-6 select-none">
-          <a href="#/wiki/home" className="hover:text-[#f9a8d4] transition-colors">WIKI</a>
+        <div className="flex items-center gap-2 text-[11px] font-mono text-[#8c7e6c] uppercase tracking-wider mb-6 select-none">
+          <a href="#/wiki/home" className="hover:text-[#dfc9ab] transition-colors">WIKI</a>
           <span>/</span>
-          <span className="text-[#c4adb7]">{article.category}</span>
+          <span className="text-[#b8a994]">{article.category}</span>
           <span>/</span>
-          <span className="text-[#f472b6]">{article.title}</span>
+          <span className="text-[#d4b28c]">{article.title}</span>
         </div>
 
         {/* Title Block */}
-        <div className="border-b border-[#2b1725] pb-6 mb-8">
-          <h1 className="font-serif text-4xl sm:text-5xl font-extrabold text-[#fce7f3] tracking-tight leading-tight">
+        <div className="border-b border-[#2b2219] pb-6 mb-8">
+          <h1 className="font-serif text-4xl sm:text-5xl font-extrabold text-[#fbf7f0] tracking-tight leading-tight">
             {article.title}
           </h1>
         </div>
@@ -242,23 +242,23 @@ export default function ArticleView({
             /* HTML Rendered view */
             <div 
               ref={containerRef}
-              className="wiki-html-content text-sm sm:text-base leading-relaxed text-[#e8d0da] space-y-6 select-text"
+              className="wiki-html-content text-sm sm:text-base leading-relaxed text-[#ede4d4] space-y-6 select-text"
               dangerouslySetInnerHTML={{ __html: htmlContent }}
             />
           )}
         </article>
 
         {/* Next/Previous Article Controls */}
-        <div className="mt-12 pt-6 border-t border-[#2b1725] flex flex-col sm:flex-row gap-4 justify-between items-stretch select-none">
+        <div className="mt-12 pt-6 border-t border-[#2b2219] flex flex-col sm:flex-row gap-4 justify-between items-stretch select-none">
           {prevArticle ? (
             <a 
               href={`#/wiki/${prevArticle.slug}`}
-              className="flex-1 flex items-center gap-3 p-4 bg-[#140c12] hover:bg-[#1f111b] border border-[#2b1725] hover:border-[#421d33] rounded-lg group transition-all"
+              className="flex-1 flex items-center gap-3 p-4 bg-[#14110d] hover:bg-[#1d1712] border border-[#2b2219] hover:border-[#453728] rounded-lg group transition-all"
             >
-              <ChevronLeft className="w-5 h-5 text-[#a88a96] group-hover:text-[#f9a8d4] transition-colors" />
+              <ChevronLeft className="w-5 h-5 text-[#8c7e6c] group-hover:text-[#dfc9ab] transition-colors" />
               <div className="text-left">
-                <div className="text-[10px] font-mono text-[#a88a96] uppercase tracking-wider">Previous Page</div>
-                <div className="text-xs font-serif text-[#fce7f3] font-semibold group-hover:text-[#f9a8d4] transition-colors mt-0.5">{prevArticle.title}</div>
+                <div className="text-[10px] font-mono text-[#8c7e6c] uppercase tracking-wider">Previous Page</div>
+                <div className="text-xs font-serif text-[#fbf7f0] font-semibold group-hover:text-[#dfc9ab] transition-colors mt-0.5">{prevArticle.title}</div>
               </div>
             </a>
           ) : (
@@ -268,13 +268,13 @@ export default function ArticleView({
           {nextArticle ? (
             <a 
               href={`#/wiki/${nextArticle.slug}`}
-              className="flex-1 flex items-center justify-between p-4 bg-[#140c12] hover:bg-[#1f111b] border border-[#2b1725] hover:border-[#421d33] rounded-lg group transition-all"
+              className="flex-1 flex items-center justify-between p-4 bg-[#14110d] hover:bg-[#1d1712] border border-[#2b2219] hover:border-[#453728] rounded-lg group transition-all"
             >
               <div className="text-left">
-                <div className="text-[10px] font-mono text-[#a88a96] uppercase tracking-wider text-right sm:text-left">Next Page</div>
-                <div className="text-xs font-serif text-[#fce7f3] font-semibold group-hover:text-[#f9a8d4] transition-colors mt-0.5">{nextArticle.title}</div>
+                <div className="text-[10px] font-mono text-[#8c7e6c] uppercase tracking-wider text-right sm:text-left">Next Page</div>
+                <div className="text-xs font-serif text-[#fbf7f0] font-semibold group-hover:text-[#dfc9ab] transition-colors mt-0.5">{nextArticle.title}</div>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#a88a96] group-hover:text-[#f9a8d4] transition-colors" />
+              <ChevronRight className="w-5 h-5 text-[#8c7e6c] group-hover:text-[#dfc9ab] transition-colors" />
             </a>
           ) : (
             <div className="flex-1 opacity-0 pointer-events-none hidden sm:block" />
@@ -285,9 +285,9 @@ export default function ArticleView({
       {/* Right Column: Table of Contents (Desktop sticky) */}
       {headings.length > 0 && (
         <aside className="hidden lg:block w-[240px] shrink-0 select-none">
-          <div className="sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto pl-4 border-l border-[#2b1725]/60 space-y-4">
-            <h3 className="font-mono text-[10px] font-bold text-[#a88a96] uppercase tracking-widest flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-[#5e2b46]" />
+          <div className="sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto pl-4 border-l border-[#2b2219]/60 space-y-4">
+            <h3 className="font-mono text-[10px] font-bold text-[#8c7e6c] uppercase tracking-widest flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-[#5a4634]" />
               On This Page
             </h3>
             
@@ -305,10 +305,10 @@ export default function ArticleView({
                     <button
                       onClick={() => handleScrollToHeading(h.id)}
                       className={`
-                        text-left hover:text-[#fce7f3] block w-full truncate cursor-pointer
+                        text-left hover:text-[#fbf7f0] block w-full truncate cursor-pointer
                         ${isActive 
-                          ? 'text-[#f9a8d4] font-medium border-l border-[#f472b6] -ml-[17px] pl-[16px]' 
-                          : 'text-[#a88a96]'
+                          ? 'text-[#dfc9ab] font-medium border-l border-[#d4b28c] -ml-[17px] pl-[16px]' 
+                          : 'text-[#8c7e6c]'
                         }
                       `}
                     >
@@ -326,7 +326,7 @@ export default function ArticleView({
       {showScrollTop && (
         <button
           onClick={handleScrollTop}
-          className="fixed bottom-6 right-6 p-2.5 bg-[#261220] hover:bg-[#381a2e] border border-[#4d1f3b] hover:border-[#6b2a4f] text-[#f9a8d4] rounded-full shadow-lg z-50 cursor-pointer transition-all hover:scale-105 duration-200"
+          className="fixed bottom-6 right-6 p-2.5 bg-[#241c14] hover:bg-[#33271c] border border-[#4d3e2c] hover:border-[#6e5539] text-[#dfc9ab] rounded-full shadow-lg z-50 cursor-pointer transition-all hover:scale-105 duration-200"
           title="Scroll to Top"
         >
           <ArrowUp className="w-4 h-4" />

@@ -250,28 +250,28 @@ function WikiContainer() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0c070a] flex flex-col items-center justify-center font-sans select-none">
+      <div className="min-h-screen bg-[#0e0b09] flex flex-col items-center justify-center font-sans select-none">
         <div className="animate-pulse flex flex-col items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#1f1019] border-2 border-[#521f3d] flex items-center justify-center shadow-[0_0_24px_rgba(244,114,182,0.25)] relative overflow-hidden">
+          <div className="w-14 h-14 rounded-2xl bg-[#211a14] border-2 border-[#524332] flex items-center justify-center shadow-[0_0_24px_rgba(212,178,140,0.25)] relative overflow-hidden">
             <img 
               src="./logo.png" 
               alt="Super Bone Meal Logo"
-              className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(244,114,182,0.5)]"
+              className="w-10 h-10 object-contain drop-shadow-[0_0_8px_rgba(212,178,140,0.5)]"
               onError={(e) => {
                 // Fallback to text emblem if image is loading
                 (e.target as HTMLElement).style.display = 'none';
               }}
             />
-            <span className="font-serif font-extrabold text-xl text-[#fce7f3] absolute">
+            <span className="font-serif font-extrabold text-xl text-[#fbf7f0] absolute">
               S
             </span>
           </div>
           <div className="flex flex-col items-center gap-1">
-            <span className="text-xs font-mono text-[#f472b6] uppercase tracking-[0.25em] font-semibold">
-              Super Bone Meal Field Guide
+            <span className="text-xs font-mono text-[#d4b28c] uppercase tracking-[0.25em] font-semibold">
+              Super Bone Meal Wiki
             </span>
-            <span className="text-[10px] font-mono text-[#8f6d7d] uppercase tracking-widest">
-              Accessing Agrarian Index...
+            <span className="text-[10px] font-mono text-[#8c7e6c] uppercase tracking-widest">
+              Loading Wiki...
             </span>
           </div>
         </div>
@@ -281,14 +281,14 @@ function WikiContainer() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0c070a] flex flex-col items-center justify-center p-6 text-center font-sans">
-        <div className="max-w-md p-6 bg-[#140c12] border border-[#3b1c2e] rounded-xl shadow-2xl">
-          <AlertCircle className="w-10 h-10 text-[#f472b6] mx-auto mb-4" />
-          <h2 className="font-serif text-lg text-[#fce7f3] font-semibold mb-2">Failed to Load Wiki Data</h2>
-          <p className="text-xs text-[#c4adb7] leading-relaxed mb-6 font-mono">{error}</p>
+      <div className="min-h-screen bg-[#0e0b09] flex flex-col items-center justify-center p-6 text-center font-sans">
+        <div className="max-w-md p-6 bg-[#14100d] border border-[#3b2f23] rounded-xl shadow-2xl">
+          <AlertCircle className="w-10 h-10 text-[#d4b28c] mx-auto mb-4" />
+          <h2 className="font-serif text-lg text-[#fbf7f0] font-semibold mb-2">Failed to Load Wiki Data</h2>
+          <p className="text-xs text-[#b8a994] leading-relaxed mb-6 font-mono">{error}</p>
           <button 
             onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-[#261220] hover:bg-[#381a2e] text-[#f9a8d4] border border-[#4d1f3b] text-xs font-mono rounded-md transition-all cursor-pointer"
+            className="px-4 py-2 bg-[#261e16] hover:bg-[#382b1e] text-[#dfc9ab] border border-[#4d3f30] text-xs font-mono rounded-md transition-all cursor-pointer"
           >
             Retry Connection
           </button>
@@ -298,7 +298,7 @@ function WikiContainer() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0609] text-[#e8d0da] font-sans flex">
+    <div className="min-h-screen bg-[#0d0b09] text-[#ede4d4] font-sans flex">
       
       {/* Sidebar - fully dynamic and searchable */}
       <Sidebar
@@ -315,19 +315,19 @@ function WikiContainer() {
       <div className="flex-1 min-w-0 flex flex-col">
         
         {/* Mobile Header Navbar */}
-        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-[#120a10]/95 backdrop-blur border-b border-[#261521]">
+        <header className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 bg-[#14100d]/95 backdrop-blur border-b border-[#261f17]">
           <button
             onClick={() => setMobileSidebarOpen(true)}
-            className="p-1.5 rounded text-[#a88a96] hover:text-[#fce7f3] hover:bg-[#20101b] transition-colors"
+            className="p-1.5 rounded text-[#8c7e6c] hover:text-[#fbf7f0] hover:bg-[#1f1812] transition-colors"
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="font-serif font-bold text-sm text-[#fce7f3] tracking-wide uppercase">
-            {activeArticle ? activeArticle.title : 'Agrarian Index'}
+          <span className="font-serif font-bold text-sm text-[#fbf7f0] tracking-wide uppercase">
+            {activeArticle ? activeArticle.title : 'Wiki Index'}
           </span>
           <button 
             onClick={() => setStatsOpen(true)}
-            className="w-8 h-8 rounded-lg bg-[#24111d] border border-[#4d1f3b] flex items-center justify-center p-1 hover:bg-[#36172a] transition-colors cursor-pointer overflow-hidden"
+            className="w-8 h-8 rounded-lg bg-[#241c14] border border-[#4d3f30] flex items-center justify-center p-1 hover:bg-[#362a1d] transition-colors cursor-pointer overflow-hidden"
             title="View Terminal Stats"
             id="header-b-icon"
           >
@@ -340,15 +340,15 @@ function WikiContainer() {
           {searchQuery.trim() ? (
             /* Show comprehensive search catalog results screen */
             <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
-              <div className="border-b border-[#281320] pb-6 mb-8 select-none">
-                <div className="flex items-center gap-2 text-xs font-mono text-[#f472b6] uppercase tracking-wider mb-2">
+              <div className="border-b border-[#292017] pb-6 mb-8 select-none">
+                <div className="flex items-center gap-2 text-xs font-mono text-[#d4b28c] uppercase tracking-wider mb-2">
                   <FileSearch className="w-4 h-4" />
                   <span>Interactive Catalog Search</span>
                 </div>
-                <h1 className="font-serif text-3xl font-bold text-[#fce7f3]">
+                <h1 className="font-serif text-3xl font-bold text-[#fbf7f0]">
                   Search results for "{searchQuery}"
                 </h1>
-                <p className="text-xs text-[#a88a96] mt-1">
+                <p className="text-xs text-[#8c7e6c] mt-1">
                   Found {searchResults.length} relevant entries in deep page contents.
                 </p>
               </div>
@@ -362,27 +362,27 @@ function WikiContainer() {
                         setSearchQuery('');
                         navigate(`/wiki/${article.slug}`);
                       }}
-                      className="p-5 bg-[#120a10] hover:bg-[#1c0e18] border border-[#261521] hover:border-[#4d1f3b] rounded-lg transition-all cursor-pointer group"
+                      className="p-5 bg-[#14100d] hover:bg-[#1c1611] border border-[#261f17] hover:border-[#4d3f30] rounded-lg transition-all cursor-pointer group"
                     >
                       <div className="flex items-center justify-between gap-4 mb-2">
-                        <h3 className="font-serif text-lg text-[#f9a8d4] group-hover:text-[#fce7f3] font-semibold transition-colors">
+                        <h3 className="font-serif text-lg text-[#dfc9ab] group-hover:text-[#fbf7f0] font-semibold transition-colors">
                           {article.title}
                         </h3>
-                        <span className="text-[10px] font-mono bg-[#1c0e18] text-[#a88a96] border border-[#331828] px-2 py-0.5 rounded uppercase">
+                        <span className="text-[10px] font-mono bg-[#1c1611] text-[#8c7e6c] border border-[#33281e] px-2 py-0.5 rounded uppercase">
                           {article.category}
                         </span>
                       </div>
-                      <p className="text-xs text-[#c4adb7] font-mono leading-relaxed bg-[#0a0508] p-3 rounded border border-[#1f0e1a] select-none">
+                      <p className="text-xs text-[#b8a994] font-mono leading-relaxed bg-[#0d0b09] p-3 rounded border border-[#1f1812] select-none">
                         {snippet}
                       </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-16 bg-[#120a10] border border-[#261521] rounded-lg select-none">
-                  <HelpCircle className="w-12 h-12 text-[#4d1f3b] mx-auto mb-4" />
-                  <p className="text-sm font-serif italic text-[#c4adb7]">No documentation matches your query.</p>
-                  <p className="text-xs text-[#a88a96] mt-2 font-mono">Try searching for keywords like "trades", "fertilizer", "radius", or "crops".</p>
+                <div className="text-center py-16 bg-[#14100d] border border-[#261f17] rounded-lg select-none">
+                  <HelpCircle className="w-12 h-12 text-[#4d3f30] mx-auto mb-4" />
+                  <p className="text-sm font-serif italic text-[#b8a994]">No documentation matches your query.</p>
+                  <p className="text-xs text-[#8c7e6c] mt-2 font-mono">Try searching for keywords like "trades", "fertilizer", "radius", or "crops".</p>
                 </div>
               )}
             </div>
@@ -397,9 +397,9 @@ function WikiContainer() {
           ) : (
             /* Fallback to index redirects */
             <div className="flex flex-col items-center justify-center h-[60vh] select-none">
-              <AlertCircle className="w-8 h-8 text-[#a88a96] mb-3" />
-              <p className="text-sm font-serif italic text-[#c4adb7]">Article not found.</p>
-              <a href="#/wiki/home" className="text-xs text-[#f472b6] hover:underline mt-2 font-mono">Return Home</a>
+              <AlertCircle className="w-8 h-8 text-[#8c7e6c] mb-3" />
+              <p className="text-sm font-serif italic text-[#b8a994]">Article not found.</p>
+              <a href="#/wiki/home" className="text-xs text-[#d4b28c] hover:underline mt-2 font-mono">Return Home</a>
             </div>
           )}
         </main>
