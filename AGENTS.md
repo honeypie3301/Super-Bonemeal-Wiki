@@ -33,3 +33,9 @@ When modifying or updating any Wiki pages, components, or mod features in this r
 ## 6. Mod Updates vs. Wiki Articles (CRITICAL REMINDER)
 - When a new mod release occurs, ONLY edit the **Wiki Maintenance Note** in `HomeView.tsx` (and `wikiArticles.ts` summary) to document the release highlights.
 - Do NOT rewrite or alter existing wiki articles unless actual source code mechanics or registries were altered in the mod build.
+
+## 7. GitHub Pages Deployment & Workflow Integrity (CRITICAL)
+- **NEVER DELETE `.github/workflows/deploy.yml`**: The wiki is deployed to GitHub Pages via GitHub Actions (`.github/workflows/deploy.yml`). Under no circumstances should this workflow or directory be deleted or ignored.
+- **Vite Base Path**: `vite.config.ts` must always configure `base: process.env.GITHUB_ACTIONS === 'true' ? '/Super-Bonemeal-Wiki/' : '/'` to ensure assets and chunks load accurately under the GitHub Pages subpath.
+- **Deployment Pipeline**: The deployment job runs on Ubuntu with Node 22, installs dependencies via `npm ci || npm install`, executes `npm run build`, and deploys `./dist` via `actions/deploy-pages@v4`.
+

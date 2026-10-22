@@ -670,29 +670,52 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
           {/* Terminal Window Header */}
           <div className="px-4 py-3 bg-[#17120e] border-b border-[#2b2118] flex items-center justify-between select-none">
             <div className="flex items-center gap-3">
-              {/* Traffic light simulation with Double-Click Telemetry Toggle */}
+              {/* Traffic light simulation with Click/Double-Click Telemetry Toggle */}
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
+                  onClick={handleStopTracking}
                   onDoubleClick={handleStopTracking}
                   title="Double-click: Stop tracking (ignore this device)"
-                  className={`w-2.5 h-2.5 rounded-full transition-colors cursor-pointer ${
-                    isDeviceIgnored 
-                      ? 'bg-red-500' 
-                      : 'bg-red-500/35 hover:bg-red-500/75'
-                  }`}
-                />
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500/40" title="Telemetry Terminal Node" />
+                  className="p-1 -m-1 flex items-center justify-center cursor-pointer group"
+                  id="stats-btn-stop-tracking"
+                >
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full transition-all ${
+                      isDeviceIgnored 
+                        ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]' 
+                        : 'bg-red-500/35 group-hover:bg-red-500/80'
+                    }`}
+                  />
+                </button>
                 <button
                   type="button"
+                  onClick={() => {
+                    setStatusNotice(`NODE: ${currentVisitorIdShort}`);
+                    setTimeout(() => setStatusNotice(null), 2800);
+                  }}
+                  className="p-1 -m-1 flex items-center justify-center cursor-pointer group"
+                  title="Telemetry Terminal Node"
+                  id="stats-btn-node-info"
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/40 group-hover:bg-amber-500/80 transition-colors" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResumeTracking}
                   onDoubleClick={handleResumeTracking}
                   title="Double-click: Resume tracking"
-                  className={`w-2.5 h-2.5 rounded-full transition-colors cursor-pointer ${
-                    !isDeviceIgnored 
-                      ? 'bg-[#dfc9ab]' 
-                      : 'bg-[#dfc9ab]/35 hover:bg-[#dfc9ab]/75'
-                  }`}
-                />
+                  className="p-1 -m-1 flex items-center justify-center cursor-pointer group"
+                  id="stats-btn-resume-tracking"
+                >
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full transition-all ${
+                      !isDeviceIgnored 
+                        ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' 
+                        : 'bg-emerald-500/35 group-hover:bg-emerald-500/80'
+                    }`}
+                  />
+                </button>
               </div>
               <div className="h-4 w-[1px] bg-[#2e241c]" />
               <div className="flex items-center gap-2">
@@ -704,7 +727,7 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
                   <span className={`text-[9px] px-2 py-0.5 rounded font-mono uppercase tracking-wider ${
                     isDeviceIgnored
                       ? 'text-red-300 bg-red-950/60 border border-red-800/60'
-                      : 'text-[#fbf7f0] bg-[#261f17] border border-[#8c7355]'
+                      : 'text-emerald-300 bg-emerald-950/60 border border-emerald-800/60'
                   }`}>
                     {statusNotice}
                   </span>

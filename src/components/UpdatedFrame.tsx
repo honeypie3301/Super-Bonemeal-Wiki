@@ -4,6 +4,7 @@
  * DON'T FORGET: Whenever you update wiki content, you MUST also update the "Wiki Maintenance & Version Update Note"
  * in `HomeView.tsx` with the latest feature/commit highlights.
  * Rule: Only underline "The wiki is always updated before a new version releases."
+ * NEVER DELETE `.github/workflows/deploy.yml` (used for automated GitHub Pages static deployment).
  */
 import React, { useEffect, useRef, useState } from 'react';
 

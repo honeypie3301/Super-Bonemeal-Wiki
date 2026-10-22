@@ -11,6 +11,10 @@
  *    - Underline ONLY the exact sentence: "<u>The wiki is always updated before a new version releases.</u>"
  * 4. <UpdatedFrame> RULE:
  *    - Wrap newly added or updated wiki content, cards, or sections in <UpdatedFrame id="..." isUpdated={true}>.
+ * 5. DEPLOYMENT INTEGRITY (NEVER DELETE deploy.yml):
+ *    - The wiki is deployed to GitHub Pages via `.github/workflows/deploy.yml`.
+ *    - `vite.config.ts` must maintain `base: process.env.GITHUB_ACTIONS === 'true' ? '/Super-Bonemeal-Wiki/' : '/'`.
+ *    - NEVER delete or remove `.github/workflows/deploy.yml`.
  * =========================================================================================
  */
 import React from 'react';

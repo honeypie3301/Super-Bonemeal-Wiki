@@ -151,7 +151,12 @@ function WikiContainer() {
 
     const recordVisit = async () => {
       try {
-        let visitorId = localStorage.getItem('bonemeal_visitor_id');
+        // Abort if device tracking is disabled
+        if (localStorage.getItem('wiki_telemetry_ignore_device') === 'true') {
+          return;
+        }
+
+        let visitorId = localStorage.getItem('bonemeal_visitor_id') || localStorage.getItem('wiki_visitor_id');
         if (!visitorId) {
           visitorId = 'surv_' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
           localStorage.setItem('bonemeal_visitor_id', visitorId);

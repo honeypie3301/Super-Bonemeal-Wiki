@@ -7,6 +7,10 @@
  * 2. MOD UPDATES vs. WIKI MAINTENANCE NOTE:
  *    - When updating mod versions or release notes, ONLY edit the Wiki Maintenance Note 
  *      in HomeView.tsx. Do NOT modify the core wiki text unless the mod mechanics themselves changed.
+ * 3. DEPLOYMENT INTEGRITY (NEVER DELETE deploy.yml):
+ *    - The wiki is deployed to GitHub Pages via `.github/workflows/deploy.yml`.
+ *    - Maintain `base: process.env.GITHUB_ACTIONS === 'true' ? '/Super-Bonemeal-Wiki/' : '/'` in vite.config.ts.
+ *    - NEVER delete or remove `.github/workflows/deploy.yml`.
  * =========================================================================================
  */
 
