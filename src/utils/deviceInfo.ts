@@ -7,6 +7,10 @@ export interface ClientEnvironment {
   browserVersion?: string;
 }
 
+/**
+ * Comprehensive OS and Browser detection database.
+ * Accurately parses modern client hints, user agents, engine flags, and platform markers.
+ */
 export function detectClientEnvironment(customUserAgent?: string): ClientEnvironment {
   const nav = typeof navigator !== 'undefined' ? navigator : null;
   const ua = customUserAgent || (nav ? nav.userAgent : '') || '';
@@ -34,7 +38,7 @@ export function detectClientEnvironment(customUserAgent?: string): ClientEnviron
 
   if (isIpadOS) {
     os = 'iPadOS';
-    const match = ua.match(/OS (\d+[._]\d+)/i);
+    const match = ua.match(/(?:OS|Version)[ /](\d+[._]\d+)/i);
     if (match) osVersion = match[1].replace(/_/g, '.');
   } else if (/iPhone/i.test(ua)) {
     os = 'iOS';
@@ -49,10 +53,7 @@ export function detectClientEnvironment(customUserAgent?: string): ClientEnviron
     const match = ua.match(/Windows Phone (\d+[._]\d+)/i);
     if (match) osVersion = match[1];
   } else if (/Windows/i.test(ua) || uaData?.platform === 'Windows') {
-    // Windows version extraction
     if (/Windows NT 10.0/i.test(ua)) {
-      // Modern Windows 11 sends Windows NT 10.0 in UA string
-      // But can be verified via Client Hints or marked as modern Windows
       os = 'Windows 10/11';
     } else if (/Windows NT 6.3/i.test(ua)) {
       os = 'Windows 8.1';
@@ -125,16 +126,25 @@ export function detectClientEnvironment(customUserAgent?: string): ClientEnviron
     os = 'Red Hat Linux';
   } else if (/SUSE/i.test(ua)) {
     os = 'SUSE Linux';
+  } else if (/Gentoo/i.test(ua)) {
+    os = 'Gentoo Linux';
+  } else if (/Alpine/i.test(ua)) {
+    os = 'Alpine Linux';
+  } else if (/Zorin/i.test(ua)) {
+    os = 'Zorin OS';
+  } else if (/Pop!_OS|PopOS/i.test(ua)) {
+    os = 'Pop!_OS';
+  } else if (/elementary/i.test(ua)) {
+    os = 'elementary OS';
   } else if (/Linux/i.test(ua) || uaData?.platform === 'Linux') {
     os = 'Linux';
   }
 
   // ----------------------------------------------------
-  // 2. Browser Detection
-  // (Order is strictly ordered from high specificity to generic Chromium/WebKit engines)
+  // 2. Browser Detection Database
+  // Ordered from most specific specialized browsers to generic engines
   // ----------------------------------------------------
 
-  // Brave Check (Brave omits 'Brave' from UA in modern versions to combat fingerprinting)
   const isBrave = Boolean(
     (nav as unknown as { brave?: { isBrave?: () => Promise<boolean> | boolean } })?.brave !== undefined ||
     /Brave/i.test(ua) ||
@@ -143,6 +153,8 @@ export function detectClientEnvironment(customUserAgent?: string): ClientEnviron
 
   if (isBrave) {
     browser = 'Brave';
+    const match = ua.match(/Chrome\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
   } else if (/Arc\//i.test(ua)) {
     browser = 'Arc';
     const match = ua.match(/Arc\/(\d+(\.\d+)*)/i);
@@ -153,6 +165,8 @@ export function detectClientEnvironment(customUserAgent?: string): ClientEnviron
     if (match) browserVersion = match[1];
   } else if (/DuckDuckGo\//i.test(ua) || /DDB\//i.test(ua)) {
     browser = 'DuckDuckGo';
+    const match = ua.match(/(?:DuckDuckGo|DDB)\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
   } else if (/Opera GX|OPR\/.*GX/i.test(ua)) {
     browser = 'Opera GX';
     const match = ua.match(/OPR\/(\d+(\.\d+)*)/i);
@@ -187,8 +201,12 @@ export function detectClientEnvironment(customUserAgent?: string): ClientEnviron
     if (match) browserVersion = match[1];
   } else if (/MicroMessenger\//i.test(ua)) {
     browser = 'WeChat';
+    const match = ua.match(/MicroMessenger\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
   } else if (/QQBrowser|MQQBrowser/i.test(ua)) {
     browser = 'QQ Browser';
+    const match = ua.match(/(?:QQBrowser|MQQBrowser)\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
   } else if (/Whale\//i.test(ua)) {
     browser = 'Naver Whale';
     const match = ua.match(/Whale\/(\d+(\.\d+)*)/i);
@@ -197,25 +215,57 @@ export function detectClientEnvironment(customUserAgent?: string): ClientEnviron
     browser = 'Tor Browser';
   } else if (/Waterfox\//i.test(ua)) {
     browser = 'Waterfox';
+    const match = ua.match(/Waterfox\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
   } else if (/PaleMoon\//i.test(ua)) {
     browser = 'Pale Moon';
+    const match = ua.match(/PaleMoon\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
   } else if (/SeaMonkey\//i.test(ua)) {
     browser = 'SeaMonkey';
-  } else if (/FxiOS\//i.test(ua)) {
-    browser = 'Firefox';
-    const match = ua.match(/FxiOS\/(\d+(\.\d+)*)/i);
+    const match = ua.match(/SeaMonkey\/(\d+(\.\d+)*)/i);
     if (match) browserVersion = match[1];
-  } else if (/Firefox\//i.test(ua)) {
-    browser = 'Firefox';
+  } else if (/LibreWolf/i.test(ua)) {
+    browser = 'LibreWolf';
     const match = ua.match(/Firefox\/(\d+(\.\d+)*)/i);
     if (match) browserVersion = match[1];
-  } else if (/CriOS\//i.test(ua)) {
-    browser = 'Chrome';
-    const match = ua.match(/CriOS\/(\d+(\.\d+)*)/i);
+  } else if (/Zen\//i.test(ua) || /ZenBrowser/i.test(ua)) {
+    browser = 'Zen Browser';
+    const match = ua.match(/Zen\/(\d+(\.\d+)*)/i);
     if (match) browserVersion = match[1];
-  } else if (/Chrome\//i.test(ua) && !/Chromium/i.test(ua)) {
+  } else if (/Orion\//i.test(ua)) {
+    browser = 'Orion';
+    const match = ua.match(/Orion\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
+  } else if (/Ghostery/i.test(ua)) {
+    browser = 'Ghostery';
+  } else if (/AlohaBrowser/i.test(ua)) {
+    browser = 'Aloha Browser';
+    const match = ua.match(/AlohaBrowser\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
+  } else if (/Puffin/i.test(ua)) {
+    browser = 'Puffin';
+    const match = ua.match(/Puffin\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
+  } else if (/Maxthon/i.test(ua)) {
+    browser = 'Maxthon';
+    const match = ua.match(/Maxthon\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
+  } else if (/SogouMSE|SogouMobileBrowser/i.test(ua)) {
+    browser = 'Sogou';
+  } else if (/Focus\//i.test(ua)) {
+    browser = 'Firefox Focus';
+    const match = ua.match(/Focus\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
+  } else if (/Klar\//i.test(ua)) {
+    browser = 'Firefox Klar';
+  } else if (/FxiOS\//i.test(ua) || /Firefox\//i.test(ua)) {
+    browser = 'Firefox';
+    const match = ua.match(/(?:Firefox|FxiOS)\/(\d+(\.\d+)*)/i);
+    if (match) browserVersion = match[1];
+  } else if (/CriOS\//i.test(ua) || (/Chrome\//i.test(ua) && !/Chromium/i.test(ua))) {
     browser = 'Chrome';
-    const match = ua.match(/Chrome\/(\d+(\.\d+)*)/i);
+    const match = ua.match(/(?:Chrome|CriOS)\/(\d+(\.\d+)*)/i);
     if (match) browserVersion = match[1];
   } else if (/Chromium\//i.test(ua)) {
     browser = 'Chromium';
@@ -223,7 +273,8 @@ export function detectClientEnvironment(customUserAgent?: string): ClientEnviron
     if (match) browserVersion = match[1];
   } else if (/HeadlessChrome/i.test(ua)) {
     browser = 'Headless Chrome';
-  } else if (/Safari\//i.test(ua) && !/Chrome|CriOS|Android/i.test(ua)) {
+  } else if (/Safari\//i.test(ua) || /AppleWebKit/i.test(ua)) {
+    // iPadOS/iOS or macOS Safari
     browser = 'Safari';
     const match = ua.match(/Version\/(\d+(\.\d+)*)/i);
     if (match) browserVersion = match[1];
@@ -231,6 +282,17 @@ export function detectClientEnvironment(customUserAgent?: string): ClientEnviron
     browser = 'Internet Explorer';
     const match = ua.match(/(?:MSIE |rv:)(\d+(\.\d+)*)/i);
     if (match) browserVersion = match[1];
+  }
+
+  // Fallback check from client hints brands if UA string was masked
+  if (browser === 'Unknown Browser' && uaData?.brands?.length) {
+    for (const b of uaData.brands) {
+      if (b.brand !== 'Not A(Brand' && b.brand !== 'Chromium') {
+        browser = b.brand;
+        browserVersion = b.version;
+        break;
+      }
+    }
   }
 
   // ----------------------------------------------------
