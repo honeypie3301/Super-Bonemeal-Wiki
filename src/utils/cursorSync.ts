@@ -146,8 +146,10 @@ export function isDesktopPointerCapable(): boolean {
   return cachedIsDesktop;
 }
 
-function sanitizeSlug(slug: string): string {
-  return (slug || 'home').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64) || 'home';
+const WIKI_ROOM_PREFIX = 'super_bonemeal';
+
+function getRoomDocId(slug: string): string {
+  return `cursors_room_${WIKI_ROOM_PREFIX}_${sanitizeSlug(slug)}`;
 }
 
 // Singleton live state
@@ -840,7 +842,7 @@ function subscribeFirestoreRoom(slug: string) {
   if (!hasConfig || !db) return;
 
   try {
-    const roomDocId = `cursors_room_${sanitizeSlug(slug)}`;
+    const roomDocId = getRoomDocId(slug);
     const roomRef = doc(db, 'stats', roomDocId);
     unsubscribeRoomSnap = onSnapshot(
       roomRef,
@@ -931,7 +933,7 @@ function buildLocalPayload(
 function sendFirestoreCursorPayload(payload: RemoteCursorData, targetSlug = payload.slug) {
   if (!hasConfig || !db) return;
   try {
-    const roomDocId = `cursors_room_${sanitizeSlug(targetSlug)}`;
+    const roomDocId = getRoomDocId(targetSlug);
     const roomRef = doc(db, 'stats', roomDocId);
     void setDoc(
       roomRef,
@@ -949,7 +951,7 @@ function sendFirestoreCursorPayload(payload: RemoteCursorData, targetSlug = payl
 function flushLeaveBeacon(targetSlug: string) {
   if (!hasConfig || !targetSlug) return;
   try {
-    const roomDocId = `cursors_room_${sanitizeSlug(targetSlug)}`;
+    const roomDocId = getRoomDocId(targetSlug);
     const projectId = firebaseConfigDetails.projectId || 'backwoods-wiki';
     const databaseId = firebaseConfigDetails.databaseId || '(default)';
     const keyParam = firebaseConfigDetails.apiKey ? `&key=${encodeURIComponent(firebaseConfigDetails.apiKey)}` : '';
@@ -1024,7 +1026,7 @@ export function initCursorSync(initialSlug = 'home'): () => void {
       ws.send(JSON.stringify({ type: 'cursor:update', cursor: payload }));
     }
     if (hasConfig && db) {
-      const roomDocId = `cursors_room_${sanitizeSlug(activeSlug)}`;
+      const roomDocId = getRoomDocId(activeSlug);
       const roomRef = doc(db, 'stats', roomDocId);
       void updateDoc(roomRef, {
         [`cursors.${LOCAL_SESSION_ID}.ts`]: now,
@@ -1653,8 +1655,9 @@ function startTelemetryPresenceStream() {
           const now = Date.now();
           const nextMap = new Map<string, RemoteCursorData>();
           querySnap.forEach((docSnap) => {
-            if (!docSnap.id.startsWith('cursors_room_')) return;
-            const slug = docSnap.id.slice('cursors_room_'.length) || 'home';
+            const prefix = `cursors_room_${WIKI_ROOM_PREFIX}_`;
+            if (!docSnap.id.startsWith(prefix)) return;
+            const slug = docSnap.id.slice(prefix.length) || 'home';
             const data = docSnap.data() as { cursors?: Record<string, RemoteCursorData> };
             const cursorsMap = data?.cursors;
             if (!cursorsMap || typeof cursorsMap !== 'object') return;
