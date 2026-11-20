@@ -694,19 +694,25 @@ function setupBroadcastChannel() {
   }
 }
 
+const CLOUDFLARE_WS_HOST = 'backwoods-wiki.minecraft-mod.workers.dev';
+
 async function probeAndConnectWebSocket() {
   if (typeof window === 'undefined') return;
   if (wsProbed === false) return;
 
+  const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const targetHost = isLocalHost ? window.location.host : CLOUDFLARE_WS_HOST;
+  const probeUrl = isLocalHost ? '/api/cursors/probe' : `https://${CLOUDFLARE_WS_HOST}/api/cursors/probe`;
+
   if (wsProbed === null) {
     try {
-      const res = await fetch('/api/cursors/probe', { method: 'GET', cache: 'no-store' });
+      const res = await fetch(probeUrl, { method: 'GET', cache: 'no-store' });
       const ct = res.headers.get('content-type') || '';
       if (!res.ok || !ct.includes('application/json')) {
         wsProbed = false;
         return;
       }
-      const data = await res.json();
+      const data = await res.json() as { ws?: boolean };
       if (!data?.ws) {
         wsProbed = false;
         return;
@@ -723,8 +729,8 @@ async function probeAndConnectWebSocket() {
   }
 
   try {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const socket = new WebSocket(`${protocol}//${window.location.host}/ws/cursors`);
+    const protocol = (window.location.protocol === 'https:' || !isLocalHost) ? 'wss:' : 'ws:';
+    const socket = new WebSocket(`${protocol}//${targetHost}/ws/cursors`);
     ws = socket;
 
     socket.onopen = () => {
@@ -1156,7 +1162,7 @@ export function broadcastLocalSelection(
     ws.send(JSON.stringify({ type: 'cursor:update', cursor: payload }));
   }
 
-  const fsInterval = transportStatus.wsConnected ? 75 : 33;
+  const fsInterval = transportStatus.wsConnected ? 120 : 110;
   const fsElapsed = now - lastFirestoreSentAt;
   if (fsElapsed >= fsInterval) {
     lastFirestoreSentAt = now;
@@ -1228,7 +1234,7 @@ export function broadcastLocalCursorMove(
   }
 
   // 3. Low-latency Firestore stream dispatch (~33ms static, ~75ms when WS also active)
-  const fsInterval = transportStatus.wsConnected ? 75 : 33;
+  const fsInterval = transportStatus.wsConnected ? 120 : 110;
   const fsElapsed = now - lastFirestoreSentAt;
   if (fsElapsed >= fsInterval) {
     lastFirestoreSentAt = now;
