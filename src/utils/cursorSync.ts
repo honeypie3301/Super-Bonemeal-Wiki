@@ -730,7 +730,7 @@ async function probeAndConnectWebSocket() {
 
   try {
     const protocol = (window.location.protocol === 'https:' || !isLocalHost) ? 'wss:' : 'ws:';
-    const socket = new WebSocket(`${protocol}//${targetHost}/ws/cursors`);
+    const socket = new WebSocket(`${protocol}//${targetHost}/ws/cursors?wiki=super-bonemeal`);
     ws = socket;
 
     socket.onopen = () => {
