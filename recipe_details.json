@@ -1,7 +1,7 @@
 {
   "super_bonemeal:super_bonemeal": [
     {
-      "file": "super_bonemeal_recipe.json",
+      "file": "data/super_bonemeal/recipe/super_bonemeal_recipe.json",
       "type": "minecraft:crafting_shapeless",
       "outputCount": 2,
       "pattern": null,

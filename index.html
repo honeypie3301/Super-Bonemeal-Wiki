@@ -3,16 +3,55 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/png" href="/logo.png" />
-    <title>Super Bone Meal Wiki</title>
-    <meta name="description" content="An interactive companion database and wiki for the Super Bone Meal Minecraft mod." />
-    <meta property="og:title" content="Super Bone Meal Wiki" />
-    <meta property="og:description" content="An interactive companion database and wiki for the Super Bone Meal Minecraft mod." />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230d120f' stroke='%23709978' stroke-width='2'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='serif' font-weight='bold' font-size='18' fill='%23a9d1b0'%3ES%3C/text%3E%3C/svg%3E" />
+    <title>Super Bonemeal Wiki</title>
+    <meta name="description" content="An interactive companion database and wiki for the Super Bonemeal Minecraft mod." />
+    <meta name="theme-color" content="#080a08" />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="Super Bonemeal Wiki" />
+    <meta property="og:description" content="An interactive companion database and wiki for the Super Bonemeal Minecraft mod." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (function () {
+        try {
+          var key = 'backwoods_wiki_theme';
+          var valid = { emerald: '#080a08', 'archival-dusk': '#13100e', 'warm-archival': '#f9f6f0', starlight: '#000000' };
+          var found = null;
+          try { found = localStorage.getItem(key); } catch (e) {}
+          if (!found || !valid[found]) {
+            try { found = sessionStorage.getItem(key); } catch (e) {}
+          }
+          if ((!found || !valid[found]) && window.name) {
+            try {
+              var parsed = JSON.parse(window.name);
+              if (parsed && parsed.__bwTheme && valid[parsed.__bwTheme]) found = parsed.__bwTheme;
+            } catch (e) {
+              var m = window.name.match(/__bwTheme=([a-z-]+)/);
+              if (m && valid[m[1]]) found = m[1];
+            }
+          }
+          if ((!found || !valid[found]) && document.cookie) {
+            var cm = document.cookie.match(/(?:^|;\s*)backwoods_wiki_theme=([a-z-]+)/);
+            if (cm && valid[cm[1]]) found = cm[1];
+          }
+          var active = found && valid[found] ? found : 'emerald';
+          var root = document.documentElement;
+          root.setAttribute('data-theme', active);
+          if (active === 'warm-archival') root.classList.remove('dark');
+          else root.classList.add('dark');
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', valid[active]);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+

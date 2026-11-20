@@ -1,19 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Calendar, 
-  Tag, 
-  Sparkles, 
-  Activity, 
-  ShieldAlert, 
-  GitCommit, 
-  Download, 
-  ExternalLink, 
-  RefreshCw, 
-  Search, 
-  Archive, 
-  Layers, 
-  ChevronDown, 
-  ChevronUp, 
+import {
+  Calendar,
+  Tag,
+  Sparkles,
+  Download,
+  ExternalLink,
+  RefreshCw,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  Box,
   FileCode,
   CheckCircle2,
   HardDrive
@@ -21,16 +17,20 @@ import {
 import UpdatedFrame from '../UpdatedFrame';
 
 export interface ModrinthFile {
-  id?: string;
+  id: string;
   url: string;
   filename: string;
-  primary?: boolean;
+  primary: boolean;
   size: number;
+  hashes: {
+    sha1?: string;
+    sha512?: string;
+  };
 }
 
 export interface ModrinthVersion {
   id: string;
-  project_id?: string;
+  project_id: string;
   name: string;
   version_number: string;
   game_versions: string[];
@@ -42,143 +42,74 @@ export interface ModrinthVersion {
   files: ModrinthFile[];
 }
 
-export interface ArchivedVersion {
-  version: string;
-  tag: string;
-  date: string;
-  status: 'scrapped' | 'milestone';
-  highlights: {
-    title: string;
-    description: string;
-  }[];
-}
+const MODRINTH_PROJECT_SLUG = 'super-bone-meal';
+const MODRINTH_PROJECT_ID = 'fX8yk2ug';
+const CACHE_KEY = 'super_bonemeal_modrinth_versions_cache';
 
-const ARCHIVED_VERSIONS: ArchivedVersion[] = [
-  {
-    version: "Super Bone Meal v1.4.0",
-    tag: "v1.4.0",
-    date: "August 21, 2026",
-    status: "milestone",
-    highlights: [
-      {
-        title: "Loot Tables Injections",
-        description: "Configured loot table generation for Archaeology (10% chance, 0–3 items), Chests (6% chance, 1–5 items), and Fishing (25% chance, 1–2 items)."
-      },
-      {
-        title: "Shapeless Crafting Recipe",
-        description: "Implemented shapeless crafting using 4 Bone Blocks and 5 Bone Meals yielding 2 Super Bone Meals."
-      },
-      {
-        title: "Metadata & Logo Ingestion",
-        description: "Integrated official mod logo asset and configured NeoForge >= 21.1.232 metadata in neoforge.mods.toml."
-      }
-    ]
-  },
-  {
-    version: "Super Bone Meal v1.3.4",
-    tag: "v1.3.4",
-    date: "August 20, 2026",
-    status: "milestone",
-    highlights: [
-      {
-        title: "Villager & Trader Economy",
-        description: "Added trades for Wandering Trader (2 Emeralds -> 1 Super Bone Meal, max 4 trades) and Level 2 Apprentice Farmer (1 Emerald -> 2 Super Bone Meals, max 10 trades)."
-      }
-    ]
-  },
-  {
-    version: "Super Bone Meal v1.0.0",
-    tag: "v1.0.0",
-    date: "February 20, 2026",
-    status: "milestone",
-    highlights: [
-      {
-        title: "Core Mechanics Deployment",
-        description: "Initial release featuring 50x2x50 volume fertilization loop and 10-cycle targeted plant growth acceleration."
-      }
-    ]
-  }
-];
-
-// Offline snapshot fallback
 const FALLBACK_MODRINTH_VERSIONS: ModrinthVersion[] = [
   {
-    id: "VwLivJ7U",
-    project_id: "fX8yk2ug",
-    name: "Super Bone Meal 1.4.0",
-    version_number: "1.4.0",
-    game_versions: ["1.21.1"],
-    loaders: ["neoforge"],
-    date_published: "2026-08-21T14:14:55.583326Z",
-    downloads: 385,
-    version_type: "release",
-    changelog: "New Content\n\n* Villager and Wanderer trading\n* 3 loot tables\n* Logo\n\nChanges\n\n* Configured shapeless crafting recipe: 4 Bone Blocks + 5 Bone Meals -> 2 Super Bone Meals\n* Verified NeoForge 1.21.1 target build requirements",
+    id: 'VwLivJ7U',
+    project_id: MODRINTH_PROJECT_ID,
+    name: 'Super Bone Meal 1.4.0',
+    version_number: '1.4.0',
+    game_versions: ['1.21.1'],
+    loaders: ['neoforge'],
+    date_published: '2026-08-21T14:14:55.583326Z',
+    downloads: 150,
+    version_type: 'release',
+    changelog: 'New Content\n\n* Villager and Wanderer trading\n* 3 loot tables\n* Logo',
     files: [
       {
-        url: "https://cdn.modrinth.com/data/fX8yk2ug/versions/VwLivJ7U/super_bonemeal-1.4.0-neoforge-1.21.1.jar",
-        filename: "super_bonemeal-1.4.0-neoforge-1.21.1.jar",
+        id: 'D1gLyMw0',
+        url: 'https://cdn.modrinth.com/data/fX8yk2ug/versions/VwLivJ7U/super_bonemeal-1.4.0-neoforge-1.21.1.jar',
+        filename: 'super_bonemeal-1.4.0-neoforge-1.21.1.jar',
         primary: true,
-        size: 89214
+        size: 89214,
+        hashes: {}
       }
     ]
   },
   {
-    id: "x6gIcEB7",
-    project_id: "fX8yk2ug",
-    name: "Super Bone Meal 1.3.3",
-    version_number: "1.3.3",
-    game_versions: ["1.21.1"],
-    loaders: ["neoforge"],
-    date_published: "2026-03-11T09:27:36.218975Z",
-    downloads: 512,
-    version_type: "release",
-    changelog: "* Targeted growth single-plant focus: directly clicking crop, sapling, or moss runs 10 pulses instantly without affecting surrounding area.\n* Adjusted vertical scan range to reduce unnecessary calculations.\n* Merged redundant check loops into a streamlined logic gate.\n* Added support for c:saplings, minecraft:crops, and snowrealmagic:plants tags.",
+    id: 'X6xf27Nm',
+    project_id: MODRINTH_PROJECT_ID,
+    name: 'Super Bone Meal 1.3.3',
+    version_number: '1.3.3',
+    game_versions: ['1.20.1'],
+    loaders: ['forge'],
+    date_published: '2026-03-11T09:38:45.806719Z',
+    downloads: 186,
+    version_type: 'release',
+    changelog: '* The Super Bone Meal is now smarter. If you use it directly on a crop, sapling, or moss block, it will focus all its power on that single plant (applying all growth stages instantly) without affecting the surrounding area.\n* Adjusted the vertical scan range for area growth to reduce unnecessary calculations.\n* Merged multiple redundant check loops into a single, streamlined if/else logic gate.\n* Added support for c:saplings and minecraft:crops tags for modded plants.',
     files: [
       {
-        url: "https://cdn.modrinth.com/data/fX8yk2ug/versions/x6gIcEB7/super_bonemeal-1.3.3-neoforge-1.21.1.jar",
-        filename: "super_bonemeal-1.3.3-neoforge-1.21.1.jar",
+        id: 'b0WDSlLR',
+        url: 'https://cdn.modrinth.com/data/fX8yk2ug/versions/X6xf27Nm/super_bonemeal-1.3.3-forge-1.20.1.jar',
+        filename: 'super_bonemeal-1.3.3-forge-1.20.1.jar',
         primary: true,
-        size: 14363
+        size: 643936,
+        hashes: {}
       }
     ]
   },
   {
-    id: "X6xf27Nm",
-    project_id: "fX8yk2ug",
-    name: "Super Bone Meal 1.3.3 (Forge)",
-    version_number: "1.3.3",
-    game_versions: ["1.20.1"],
-    loaders: ["forge"],
-    date_published: "2026-03-11T09:38:45.806719Z",
-    downloads: 1290,
-    version_type: "release",
-    changelog: "Minecraft 1.20.1 Forge port.\n\n* Single plant focus mode\n* Tag compatibility for forge crops",
+    id: 'x6gIcEB7',
+    project_id: MODRINTH_PROJECT_ID,
+    name: 'Super Bone Meal 1.3.3',
+    version_number: '1.3.3',
+    game_versions: ['1.21.1'],
+    loaders: ['neoforge'],
+    date_published: '2026-03-11T09:27:36.218975Z',
+    downloads: 140,
+    version_type: 'release',
+    changelog: '* The Super Bone Meal is now smarter. If you use it directly on a crop, sapling, or moss block, it will focus all its power on that single plant (applying all growth stages instantly) without affecting the surrounding area.\n* Adjusted the vertical scan range for area growth to reduce unnecessary calculations.\n* Merged multiple redundant check loops into a single, streamlined if/else logic gate.\n* Added support for c:saplings and minecraft:crops tags for modded plants.',
     files: [
       {
-        url: "https://cdn.modrinth.com/data/fX8yk2ug/versions/X6xf27Nm/super_bonemeal-1.3.3-forge-1.20.1.jar",
-        filename: "super_bonemeal-1.3.3-forge-1.20.1.jar",
+        id: 'xlDuDbpI',
+        url: 'https://cdn.modrinth.com/data/fX8yk2ug/versions/x6gIcEB7/super_bonemeal-1.3.3-neoforge-1.21.1.jar',
+        filename: 'super_bonemeal-1.3.3-neoforge-1.21.1.jar',
         primary: true,
-        size: 643936
-      }
-    ]
-  },
-  {
-    id: "tLC9m5S6",
-    project_id: "fX8yk2ug",
-    name: "Super Bone Meal 1.3.2",
-    version_number: "1.3.2",
-    game_versions: ["1.21.1"],
-    loaders: ["neoforge"],
-    date_published: "2026-02-26T15:36:59.026536Z",
-    downloads: 410,
-    version_type: "release",
-    changelog: "* Implemented tag-based detection for saplings and crops.\n* Added Moss Block spreading logic support.\n* Reduced AOE height scan range.",
-    files: [
-      {
-        url: "https://cdn.modrinth.com/data/fX8yk2ug/versions/tLC9m5S6/super_bonemeal_experimental-1.3.2-neoforge-1.21.1.jar",
-        filename: "super_bonemeal_experimental-1.3.2-neoforge-1.21.1.jar",
-        primary: true,
-        size: 14452
+        size: 14363,
+        hashes: {}
       }
     ]
   }
@@ -189,8 +120,7 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) {
     return `${(bytes / 1024).toFixed(1)} KB`;
   }
-  const mb = bytes / (1024 * 1024);
-  return `${mb.toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 function formatDate(dateStr: string): string {
@@ -207,34 +137,34 @@ function formatDate(dateStr: string): string {
   }
 }
 
-// Simple parser for changelog text (markdown bullet points and bold tags)
 function renderChangelog(text?: string) {
-  if (!text) return <p className="text-xs text-[#8c7e6c] italic">No changelog provided.</p>;
-  
+  if (!text) return <p className="text-xs text-[#5a6b5e] italic">No changelog provided.</p>;
+
   const lines = text.split('\n');
   return (
-    <div className="space-y-1.5 text-xs text-[#cfc2ae] font-mono leading-relaxed">
+    <div className="space-y-1.5 text-xs text-[#a3ada3] font-mono leading-relaxed">
       {lines.map((line, idx) => {
         const trimmed = line.trim();
         if (!trimmed) return <div key={idx} className="h-1" />;
-        
+
         if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
           const content = trimmed.substring(2);
           return (
             <div key={idx} className="flex items-start gap-2 pl-2">
-              <span className="text-[#dfc9ab] select-none mt-1">•</span>
+              <span className="text-[#a9d1b0] select-none mt-1">•</span>
               <span>{content}</span>
             </div>
           );
         }
-        
+
         if (trimmed.endsWith(':') || trimmed.toLowerCase() === 'new content' || trimmed.toLowerCase() === 'changes') {
           return (
-            <div key={idx} className="font-bold text-[#fbf7f0] font-serif uppercase tracking-wider pt-2 pb-0.5 text-[11px] border-b border-[#2b2219]">
+            <div key={idx} className="font-bold text-[#e0e7e0] font-serif uppercase tracking-wider pt-2 pb-0.5 text-[11px] border-b border-[#1c241e]">
               {trimmed}
             </div>
           );
         }
+
         return <div key={idx}>{trimmed}</div>;
       })}
     </div>
@@ -245,14 +175,10 @@ export default function VersionsView() {
   const [modrinthVersions, setModrinthVersions] = useState<ModrinthVersion[]>(FALLBACK_MODRINTH_VERSIONS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isLive, setIsLive] = useState<boolean>(false);
-  const [, setLastUpdated] = useState<Date | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Filters
-  const [activeTab, setActiveTab] = useState<'all' | 'modrinth' | 'archived'>('all');
   const [loaderFilter, setLoaderFilter] = useState<'all' | 'neoforge' | 'forge'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-
-  // Expandable changelogs
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
   const toggleChangelog = (id: string) => {
@@ -262,9 +188,9 @@ export default function VersionsView() {
   const fetchVersions = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('https://api.modrinth.com/v2/project/super-bone-meal/version', {
+      const res = await fetch(`https://api.modrinth.com/v2/project/${MODRINTH_PROJECT_SLUG}/version`, {
         headers: {
-          'User-Agent': 'SuperBoneMealWiki/1.0 (https://github.com/honeypie3301/Super-Bonemeal-Wiki)'
+          'User-Agent': 'SuperBonemealWiki/1.0 (https://github.com/honeypie3301/Super-Bonemeal-Wiki)'
         }
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -274,7 +200,7 @@ export default function VersionsView() {
         setIsLive(true);
         setLastUpdated(new Date());
         try {
-          localStorage.setItem('super_bonemeal_modrinth_versions_cache', JSON.stringify({
+          localStorage.setItem(CACHE_KEY, JSON.stringify({
             timestamp: Date.now(),
             data
           }));
@@ -283,9 +209,8 @@ export default function VersionsView() {
         }
       }
     } catch {
-      // Try local cache fallback
       try {
-        const cached = localStorage.getItem('super_bonemeal_modrinth_versions_cache');
+        const cached = localStorage.getItem(CACHE_KEY);
         if (cached) {
           const parsed = JSON.parse(cached);
           if (Array.isArray(parsed.data)) {
@@ -305,15 +230,12 @@ export default function VersionsView() {
     fetchVersions();
   }, []);
 
-  // Filtered Modrinth versions
   const filteredModrinth = useMemo(() => {
     return modrinthVersions.filter(v => {
-      // Loader match
       if (loaderFilter !== 'all') {
         const hasLoader = v.loaders.some(l => l.toLowerCase() === loaderFilter);
         if (!hasLoader) return false;
       }
-      // Search match
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesName = v.name.toLowerCase().includes(q);
@@ -326,380 +248,245 @@ export default function VersionsView() {
     });
   }, [modrinthVersions, loaderFilter, searchQuery]);
 
-  // Filtered Archived versions
-  const filteredArchived = useMemo(() => {
-    return ARCHIVED_VERSIONS.filter(v => {
-      if (loaderFilter !== 'all' && loaderFilter !== 'neoforge') {
-        return false;
-      }
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchesVer = v.version.toLowerCase().includes(q);
-        const matchesTag = v.tag.toLowerCase().includes(q);
-        const matchesHighlights = v.highlights.some(h => 
-          h.title.toLowerCase().includes(q) || h.description.toLowerCase().includes(q)
-        );
-        if (!matchesVer && !matchesTag && !matchesHighlights) return false;
-      }
-      return true;
-    });
-  }, [loaderFilter, searchQuery]);
-
-  const totalModrinthCount = modrinthVersions.length;
-  const totalArchivedCount = ARCHIVED_VERSIONS.length;
-
   return (
-    <UpdatedFrame id="versions_modrinth_hybrid" isUpdated={true}>
+    <UpdatedFrame id="sb_versions_modrinth" isUpdated={true}>
       <div className="space-y-8 py-2 select-text">
-        
         {/* Header Overview Card */}
-        <div className="p-5 bg-[#14100c] border border-[#2c2219] rounded-xl relative overflow-hidden">
+        <div className="p-5 bg-[#0f1210] border border-[#1c241e] rounded-xl relative overflow-hidden">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
-                <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#fbf7f0] tracking-wide">
+                <h2 className="font-serif text-xl sm:text-2xl font-bold text-[#e0e7e0] tracking-wide">
                   Version Archive &amp; Release Log
                 </h2>
                 {isLive ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-[#261e16] text-[#dfc9ab] border border-[#6b5842]">
-                    <CheckCircle2 className="w-2.5 h-2.5 text-[#dfc9ab]" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-950/70 text-emerald-300 border border-emerald-800">
+                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
                     LIVE MODRINTH
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-[#221c16] text-amber-300 border border-amber-800/60">
-                    SNAPSHOT
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-[#1d1b14] text-amber-300 border border-amber-800/60">
+                    SNAPSHOT CACHE
                   </span>
                 )}
               </div>
-              <p className="text-xs text-[#b8a994] leading-relaxed max-w-2xl font-sans">
-                Official release versions synchronized via the Modrinth REST API alongside preserved internal pre-release milestone chronicles.
+              <p className="text-xs text-[#829285] font-mono leading-relaxed max-w-2xl">
+                Synchronized live with the Modrinth API for Super Bone Meal ({MODRINTH_PROJECT_ID}).
+                {lastUpdated && (
+                  <span className="text-[#5a6b5e] ml-2">
+                    • Synced {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
               </p>
             </div>
 
-            {/* Quick Actions */}
-            <div className="flex items-center gap-2 self-start md:self-center shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <button
                 onClick={fetchVersions}
                 disabled={isLoading}
-                title="Refresh releases from Modrinth"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1a1510] hover:bg-[#251d16] text-[#dfc9ab] border border-[#3d3124] rounded-lg text-xs font-mono transition-all disabled:opacity-50 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#141a15] hover:bg-[#1c241e] border border-[#2a362d] text-[#a9d1b0] text-xs font-mono transition-colors cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-                <span>{isLoading ? 'Syncing...' : 'Sync Modrinth'}</span>
+                <span>{isLoading ? 'Syncing...' : 'Refresh API'}</span>
               </button>
               <a
-                href="https://modrinth.com/mod/super-bone-meal/versions"
+                href={`https://modrinth.com/mod/${MODRINTH_PROJECT_SLUG}/versions`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#261e16] hover:bg-[#33281e] text-[#fbf7f0] border border-[#6b5842] rounded-lg text-xs font-mono transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#122618] hover:bg-[#193522] border border-[#2a5436] text-[#81caa9] text-xs font-mono transition-colors"
               >
                 <span>Modrinth Page</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           </div>
 
-          {/* Quick Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-[#261e17]">
-            <div className="p-2.5 bg-[#0d0b09] border border-[#221a13] rounded-lg">
-              <span className="text-[10px] font-mono text-[#8c7e6c] uppercase block">Latest Build</span>
-              <span className="text-xs font-mono font-bold text-[#dfc9ab]">
+          <div className="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-[#1c241e]">
+            <div className="bg-[#0a0d0b] border border-[#172019] rounded-lg p-3">
+              <div className="text-[10px] font-mono text-[#5a6b5e] uppercase tracking-wider">Public Builds</div>
+              <div className="text-lg font-bold font-mono text-[#e0e7e0] mt-0.5">{modrinthVersions.length}</div>
+            </div>
+            <div className="bg-[#0a0d0b] border border-[#172019] rounded-lg p-3">
+              <div className="text-[10px] font-mono text-[#5a6b5e] uppercase tracking-wider">Target Version</div>
+              <div className="text-lg font-bold font-mono text-[#a9d1b0] mt-0.5">1.21.1</div>
+            </div>
+            <div className="bg-[#0a0d0b] border border-[#172019] rounded-lg p-3">
+              <div className="text-[10px] font-mono text-[#5a6b5e] uppercase tracking-wider">Latest Release</div>
+              <div className="text-lg font-bold font-mono text-emerald-400 mt-0.5">
                 v{modrinthVersions[0]?.version_number || '1.4.0'}
-              </span>
-            </div>
-            <div className="p-2.5 bg-[#0d0b09] border border-[#221a13] rounded-lg">
-              <span className="text-[10px] font-mono text-[#8c7e6c] uppercase block">Modrinth Releases</span>
-              <span className="text-xs font-mono font-bold text-[#fbf7f0]">
-                {totalModrinthCount} builds
-              </span>
-            </div>
-            <div className="p-2.5 bg-[#0d0b09] border border-[#221a13] rounded-lg">
-              <span className="text-[10px] font-mono text-[#8c7e6c] uppercase block">Milestones</span>
-              <span className="text-xs font-mono font-bold text-amber-300">
-                {totalArchivedCount} chronicles
-              </span>
-            </div>
-            <div className="p-2.5 bg-[#0d0b09] border border-[#221a13] rounded-lg">
-              <span className="text-[10px] font-mono text-[#8c7e6c] uppercase block">Primary Platform</span>
-              <span className="text-xs font-mono font-bold text-[#d4b28c]">
-                NeoForge 1.21.1
-              </span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Filter Toolbar */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3 bg-[#120f0c] border border-[#241c15] rounded-xl">
-          {/* Category Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              onClick={() => setActiveTab('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
-                activeTab === 'all'
-                  ? 'bg-[#2a2118] text-[#fbf7f0] border border-[#8c7355] font-bold'
-                  : 'bg-[#18130f] text-[#b8a994] hover:text-[#fbf7f0] border border-[#2c2219]'
-              }`}
-            >
-              All Versions ({totalModrinthCount + (loaderFilter === 'all' || loaderFilter === 'neoforge' ? totalArchivedCount : 0)})
-            </button>
-            <button
-              onClick={() => setActiveTab('modrinth')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
-                activeTab === 'modrinth'
-                  ? 'bg-[#2a2118] text-[#fbf7f0] border border-[#8c7355] font-bold'
-                  : 'bg-[#18130f] text-[#b8a994] hover:text-[#fbf7f0] border border-[#2c2219]'
-              }`}
-            >
-              <HardDrive className="w-3 h-3" />
-              Official Releases ({totalModrinthCount})
-            </button>
-            <button
-              onClick={() => setActiveTab('archived')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
-                activeTab === 'archived'
-                  ? 'bg-[#261f17] text-amber-300 border border-amber-700/80 font-bold'
-                  : 'bg-[#18130f] text-[#b8a994] hover:text-[#fbf7f0] border border-[#2c2219]'
-              }`}
-            >
-              <Archive className="w-3 h-3" />
-              Milestone Archives ({totalArchivedCount})
-            </button>
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-[#0c0f0d] p-3 border border-[#18201a] rounded-xl">
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { id: 'all', label: 'All Loaders' },
+              { id: 'neoforge', label: 'NeoForge' },
+              { id: 'forge', label: 'Forge' }
+            ].map(loader => (
+              <button
+                key={loader.id}
+                onClick={() => setLoaderFilter(loader.id as typeof loaderFilter)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-colors cursor-pointer border ${
+                  loaderFilter === loader.id
+                    ? 'bg-[#19281d] text-[#a9d1b0] border-[#2e4835]'
+                    : 'bg-transparent text-[#829285] border-transparent hover:text-[#c9d1c9]'
+                }`}
+              >
+                {loader.label}
+              </button>
+            ))}
           </div>
 
-          {/* Secondary Controls: Loader filter + search query */}
-          <div className="flex items-center gap-2">
-            {/* Loader Filter */}
-            <div className="flex items-center gap-1 bg-[#17120e] border border-[#2b2118] rounded-lg p-0.5 text-[11px] font-mono">
-              <button
-                onClick={() => setLoaderFilter('all')}
-                className={`px-2 py-1 rounded transition-colors cursor-pointer ${
-                  loaderFilter === 'all' ? 'bg-[#271f16] text-[#dfc9ab] font-bold' : 'text-[#8c7e6c] hover:text-[#ede4d4]'
-                }`}
-              >
-                All Loaders
-              </button>
-              <button
-                onClick={() => setLoaderFilter('neoforge')}
-                className={`px-2 py-1 rounded transition-colors cursor-pointer ${
-                  loaderFilter === 'neoforge' ? 'bg-[#271f16] text-[#dfc9ab] font-bold' : 'text-[#8c7e6c] hover:text-[#ede4d4]'
-                }`}
-              >
-                NeoForge
-              </button>
-              <button
-                onClick={() => setLoaderFilter('forge')}
-                className={`px-2 py-1 rounded transition-colors cursor-pointer ${
-                  loaderFilter === 'forge' ? 'bg-[#271f16] text-[#dfc9ab] font-bold' : 'text-[#8c7e6c] hover:text-[#ede4d4]'
-                }`}
-              >
-                Forge
-              </button>
-            </div>
-
-            {/* Keyword Search */}
-            <div className="relative flex items-center min-w-[160px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#8c7e6c] pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Filter version / changelog..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-[#17120e] border border-[#2b2118] rounded-lg py-1 pl-8 pr-2 text-xs text-[#ede4d4] placeholder-[#8c7e6c] focus:outline-none focus:border-[#c5a880]"
-              />
-            </div>
+          <div className="relative min-w-[200px]">
+            <Search className="w-3.5 h-3.5 text-[#5a6b5e] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search versions..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[#080a08] border border-[#1c241e] rounded-lg py-1.5 pl-8.5 pr-3 text-xs font-mono text-[#e0e7e0] placeholder:text-[#4e5d51] focus:outline-none focus:border-[#709978]"
+            />
           </div>
         </div>
 
-        {/* Timeline Stream */}
-        <div className="relative pl-6 sm:pl-8 border-l border-[#2c2219] space-y-10">
-          
-          {/* 1. Official Modrinth Releases */}
-          {(activeTab === 'all' || activeTab === 'modrinth') && (
-            <>
-              {filteredModrinth.map((v) => {
-                const primaryFile = v.files.find(f => f.primary) || v.files[0];
-                const isExpanded = !!expandedIds[v.id];
-                const gameVerStr = v.game_versions.join(', ');
-                const loaderStr = v.loaders.join(', ');
+        {/* Version Timeline */}
+        <div className="relative border-l-2 border-[#1e261f] ml-3 sm:ml-4 pl-6 sm:pl-8 space-y-6">
+          {filteredModrinth.map((v, idx) => {
+            const isLatest = idx === 0 && loaderFilter === 'all' && !searchQuery.trim();
+            const isExpanded = expandedIds[v.id] ?? isLatest;
+            const primaryFile = v.files.find(f => f.primary) || v.files[0];
 
-                return (
-                  <div key={v.id} className="relative group">
-                    {/* Timeline Node */}
-                    <div className="absolute -left-[31px] sm:-left-[39px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full bg-[#0d0b09] border-2 border-[#d4b28c] shadow-sm shadow-[#2b2118] z-10">
-                      <GitCommit className="w-3.5 h-3.5 text-[#d4b28c]" />
-                    </div>
+            return (
+              <div key={v.id} className="relative">
+                <span
+                  className={`absolute -left-[31px] sm:-left-[39px] top-6 w-3 h-3 rounded-full border-2 ${
+                    isLatest
+                      ? 'bg-[#709978] border-[#a9d1b0] shadow-[0_0_10px_#709978]'
+                      : 'bg-[#111612] border-[#303d33]'
+                  }`}
+                />
 
-                    {/* Version Card */}
-                    <div className="bg-[#14100c] border border-[#281f16] hover:border-[#423324] rounded-xl p-5 space-y-4 transition-all">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            <h3 className="font-serif text-lg sm:text-xl font-bold text-[#fbf7f0] tracking-tight">
-                              {v.name}
-                            </h3>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#241c15] text-[#dfc9ab] border border-[#594733] uppercase">
-                              <Tag className="w-2.5 h-2.5" />
-                              v{v.version_number}
-                            </span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#1d1711] text-[#cbb89e] border border-[#3b2f22]">
-                              {loaderStr.toUpperCase()} • {gameVerStr}
-                            </span>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[9px] font-mono uppercase bg-[#261e16] text-[#dfc9ab] border border-[#6b5842]">
-                              Official
-                            </span>
-                          </div>
-
-                          <div className="flex flex-wrap items-center gap-4 text-xs text-[#8c7e6c] font-mono pt-0.5">
-                            <span className="flex items-center gap-1.5">
-                              <Calendar className="w-3.5 h-3.5 text-[#d4b28c]" />
-                              {formatDate(v.date_published)}
-                            </span>
-                            <span className="flex items-center gap-1.5 text-[#b8a994]">
-                              <Download className="w-3.5 h-3.5 text-[#d4b28c]" />
-                              {v.downloads.toLocaleString()} downloads
-                            </span>
-                            {primaryFile && (
-                              <span className="flex items-center gap-1.5 text-[#8c7e6c]">
-                                <FileCode className="w-3.5 h-3.5" />
-                                {formatBytes(primaryFile.size)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Direct Download Button */}
-                        {primaryFile && (
-                          <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
-                            <a
-                              href={primaryFile.url}
-                              download
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#251d16] hover:bg-[#36291e] text-[#fbf7f0] hover:text-white border border-[#6b5842] rounded-lg text-xs font-mono font-bold transition-all shadow-sm"
-                            >
-                              <Download className="w-3.5 h-3.5 text-[#dfc9ab]" />
-                              <span>Download .jar</span>
-                            </a>
-                            <a
-                              href={`https://modrinth.com/mod/super-bone-meal/version/${v.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title="Inspect on Modrinth"
-                              className="p-1.5 bg-[#17120e] hover:bg-[#251d16] text-[#8c7e6c] hover:text-[#dfc9ab] border border-[#2b2118] rounded-lg transition-colors"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
-                          </div>
+                <div className="p-5 bg-[#0f1210] border border-[#1c241e] hover:border-[#2a362d] rounded-xl transition-all space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-[#19201a] pb-3.5">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-serif text-lg sm:text-xl font-bold text-[#e0e7e0]">
+                          {v.name}
+                        </h3>
+                        {isLatest && (
+                          <span className="px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider bg-[#152e1e] text-[#a9d1b0] border border-[#2d5a3b] rounded">
+                            LATEST RELEASE
+                          </span>
                         )}
+                        <span className="px-2 py-0.5 text-[10px] font-mono font-semibold uppercase rounded border bg-[#121c15] text-[#81caa9] border-[#213e2a]">
+                          {v.version_type}
+                        </span>
                       </div>
 
-                      {/* Expandable Changelog Accordion */}
-                      {v.changelog && (
-                        <div className="pt-2 border-t border-[#261e17]">
-                          <button
-                            onClick={() => toggleChangelog(v.id)}
-                            className="flex items-center justify-between w-full text-left py-1 text-xs font-mono text-[#b8a994] hover:text-[#fbf7f0] transition-colors cursor-pointer"
-                          >
-                            <span className="flex items-center gap-1.5 font-semibold">
-                              <FileCode className="w-3.5 h-3.5 text-[#d4b28c]" />
-                              {isExpanded ? 'Hide Release Changelog' : 'View Release Changelog'}
-                            </span>
-                            {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          </button>
-                          {isExpanded && (
-                            <div className="mt-3 p-4 bg-[#0d0b09] border border-[#221b14] rounded-lg">
-                              {renderChangelog(v.changelog)}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-
-          {/* 2. Archived / Milestone Versions */}
-          {(activeTab === 'all' || activeTab === 'archived') && (
-            <>
-              {filteredArchived.map((v) => (
-                <div key={v.version} className="relative group">
-                  {/* Timeline Node */}
-                  <div className="absolute -left-[31px] sm:-left-[39px] top-1.5 flex items-center justify-center w-6 h-6 rounded-full bg-[#0d0b09] border-2 border-amber-600/80 shadow-sm shadow-amber-950/20 z-10">
-                    <Archive className="w-3.5 h-3.5 text-amber-400" />
-                  </div>
-
-                  {/* Version Card */}
-                  <div className="bg-[#14100c] border border-amber-900/30 hover:border-amber-800/50 rounded-xl p-5 space-y-4 transition-all">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2.5">
-                          <h3 className="font-serif text-lg sm:text-xl font-bold text-[#fbf7f0] tracking-tight">
-                            {v.version}
-                          </h3>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-[#261e16] text-amber-300 border border-amber-800/60 uppercase">
-                            <Tag className="w-2.5 h-2.5" />
-                            {v.tag}
-                          </span>
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#1d1711] text-amber-400/90 border border-[#3d2f21] uppercase">
-                            Milestone Chronicle
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-[#8c7e6c] font-mono">
-                          <Calendar className="w-3.5 h-3.5 text-[#d4b28c]" />
-                          <span>Recorded Milestone: {v.date}</span>
-                        </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-[#7a8a7d]">
+                        <span className="flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-[#5a6b5e]" />
+                          v{v.version_number}
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-[#5a6b5e]" />
+                          {formatDate(v.date_published)}
+                        </span>
+                        <span>•</span>
+                        <span className="flex items-center gap-1">
+                          <Download className="w-3 h-3 text-[#5a6b5e]" />
+                          {v.downloads.toLocaleString()} downloads
+                        </span>
                       </div>
                     </div>
 
-                    {/* Developmental Highlights */}
-                    <div className="grid gap-3 pt-2">
-                      {v.highlights.map((h, hIdx) => (
-                        <div
-                          key={hIdx}
-                          className="p-3.5 bg-[#0d0b09] border border-[#221a13] rounded-lg"
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                      {v.loaders.map(loader => (
+                        <span
+                          key={loader}
+                          className="px-2 py-1 text-[10px] font-mono font-bold uppercase rounded bg-[#151b16] text-[#a9d1b0] border border-[#263329] flex items-center gap-1"
                         >
-                          <div className="flex gap-3">
-                            <div className="mt-0.5 p-1 rounded bg-[#1c1611] border border-[#2e2319] shrink-0 h-fit">
-                              {hIdx === 0 && <Sparkles className="w-3.5 h-3.5 text-[#d4b28c]" />}
-                              {hIdx === 1 && <Activity className="w-3.5 h-3.5 text-[#dfc9ab]" />}
-                              {hIdx === 2 && <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />}
-                            </div>
-                            <div className="space-y-0.5">
-                              <h4 className="font-serif text-xs font-bold text-[#fbf7f0]">
-                                {h.title}
-                              </h4>
-                              <p className="text-xs text-[#b8a994] leading-relaxed font-sans">
-                                {h.description}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
+                          <Box className="w-2.5 h-2.5 text-[#709978]" />
+                          {loader}
+                        </span>
+                      ))}
+                      {v.game_versions.map(gv => (
+                        <span
+                          key={gv}
+                          className="px-2 py-1 text-[10px] font-mono rounded bg-[#111512] text-[#8fa093] border border-[#1f2922]"
+                        >
+                          MC {gv}
+                        </span>
                       ))}
                     </div>
                   </div>
+
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => toggleChangelog(v.id)}
+                      className="flex items-center justify-between w-full text-left text-xs font-mono text-[#a9d1b0] hover:text-[#e0e7e0] transition-colors cursor-pointer py-1"
+                    >
+                      <span className="flex items-center gap-1.5 font-semibold uppercase tracking-wider text-[11px]">
+                        <FileCode className="w-3.5 h-3.5 text-[#709978]" />
+                        Release Changelog
+                      </span>
+                      {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+
+                    {isExpanded && (
+                      <div className="bg-[#090b09] border border-[#161c17] rounded-lg p-3.5 mt-1">
+                        {renderChangelog(v.changelog)}
+                      </div>
+                    )}
+                  </div>
+
+                  {primaryFile && (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-[#161d17] text-[11px] font-mono">
+                      <div className="flex items-center gap-2 text-[#6e7e71] truncate">
+                        <HardDrive className="w-3.5 h-3.5 shrink-0 text-[#5a6b5e]" />
+                        <span className="truncate">{primaryFile.filename}</span>
+                        <span className="text-[#4a594d] shrink-0">({formatBytes(primaryFile.size)})</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={`https://modrinth.com/mod/${MODRINTH_PROJECT_SLUG}/version/${v.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 rounded bg-[#141a15] hover:bg-[#1c241e] border border-[#232f25] text-[#8fa093] hover:text-[#e0e7e0] transition-colors flex items-center gap-1"
+                        >
+                          <span>Details</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </a>
+                        <a
+                          href={primaryFile.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-2.5 py-1 rounded bg-[#152e1e] hover:bg-[#1c3e28] border border-[#2d5a3b] text-[#a9d1b0] transition-colors flex items-center gap-1 font-semibold"
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>Download JAR</span>
+                        </a>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </>
-          )}
-
-          {/* Empty State */}
-          {filteredModrinth.length === 0 && filteredArchived.length === 0 && (
-            <div className="p-8 text-center bg-[#14100c] border border-[#2c2219] rounded-xl space-y-2">
-              <p className="text-sm text-[#b8a994] font-mono">No matching versions found.</p>
-              <button
-                onClick={() => {
-                  setSearchQuery('');
-                  setLoaderFilter('all');
-                  setActiveTab('all');
-                }}
-                className="text-xs text-[#dfc9ab] hover:underline font-mono cursor-pointer"
-              >
-                Clear active filters
-              </button>
-            </div>
-          )}
-
+              </div>
+            );
+          })}
         </div>
+
+        {filteredModrinth.length === 0 && (
+          <div className="text-center py-12 bg-[#0f1210] border border-[#1c241e] rounded-xl space-y-2">
+            <Sparkles className="w-8 h-8 text-[#5a6b5e] mx-auto" />
+            <p className="text-sm font-serif text-[#a3ada3]">No matching release versions found.</p>
+          </div>
+        )}
       </div>
     </UpdatedFrame>
   );

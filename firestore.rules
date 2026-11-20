@@ -1,27 +1,41 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Super Bone Meal Telemetry Collections
-    match /bonemeal_visitors/{visitorId} {
-      allow read, write: if true;
-    }
-    match /bonemeal_stats/{docId} {
-      allow read, write: if true;
-    }
-    match /bonemeal_telemetry_logs/{logId} {
-      allow read, create: if true;
-      allow update, delete: if false;
-    }
-
-    // Legacy fallback matches
     match /visitors/{visitorId} {
-      allow read, write: if true;
+      allow get, create, update: if true;
+      allow list, delete: if false;
+    }
+    match /stats/radians_control {
+      allow read: if true;
+      allow create, update: if request.resource.data.angularSpeed is number
+                            && request.resource.data.angularSpeed >= -5.0
+                            && request.resource.data.angularSpeed <= 5.0
+                            && request.resource.data.radialSpeed is number
+                            && request.resource.data.isPaused is bool;
+      allow delete: if false;
     }
     match /stats/{docId} {
-      allow read, write: if true;
+      allow read, create, update: if true;
+      allow delete: if false;
+    }
+    match /telemetry/{docId} {
+      allow read, write: if false;
     }
     match /telemetry_logs/{logId} {
-      allow read, create: if true;
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['timestamp', 'type', 'slug', 'visitorId'])
+                    && request.resource.data.visitorId is string
+                    && request.resource.data.slug is string
+                    && request.resource.data.type is string;
+      allow update, delete: if false;
+    }
+    match /honey_logs/{logId} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['timestamp', 'visitorId', 'page', 'reason', 'target'])
+                    && request.resource.data.visitorId is string
+                    && request.resource.data.page is string
+                    && request.resource.data.reason is string
+                    && request.resource.data.target is string;
       allow update, delete: if false;
     }
   }

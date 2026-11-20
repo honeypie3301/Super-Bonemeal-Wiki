@@ -1,3 +1,13 @@
+/**
+ * ========================================================================================
+ * AI ASSISTANT MAINTENANCE NOTICE & CONTROL PROTOCOL:
+ * ========================================================================================
+ * REMINDER FOR AI ASSISTANTS:
+ * The Telemetry system (StatsModal & LiveRadiansTab) is the secret control panel of the wiki.
+ * It provides live multi-client synchronization, celestial rotation telemetry, real-time audit
+ * log analysis, and secret admin override capabilities for the Backwoods Survival Index.
+ * ========================================================================================
+ */
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -8,42 +18,91 @@ import {
   Terminal, 
   Eye, 
   Database,
+  BarChart3,
   Radio,
   Layers,
-  Search
+  Clock,
+  Search,
+  Monitor,
+  Maximize2,
+  Minimize2,
+  MousePointerClick,
+  ChevronLeft,
+  ChevronRight,
+  Github,
+  Lock,
+  LogOut,
+  ShieldAlert
 } from 'lucide-react';
+import { 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  signOut, 
+  User 
+} from 'firebase/auth';
+const LiveRadiansTab = React.lazy(() => import('./special/LiveRadiansTab'));
+const LiveCursorsTab = React.lazy(() => import('./special/LiveCursorsTab'));
 import { 
   doc, 
   getDoc, 
   setDoc, 
   addDoc, 
   getDocs,
-  where,
   collection, 
   increment, 
   serverTimestamp, 
   query, 
   orderBy, 
+  where,
   limit, 
   onSnapshot 
 } from 'firebase/firestore';
-import { db, hasConfig } from '../lib/firebase';
+import { db, auth, githubProvider, hasConfig } from '../lib/firebase';
+import { detectClientEnvironment } from '../utils/deviceInfo';
+import {
+  ArchiveSyncStatus,
+  ensureArchiveHydrated,
+  getArchiveSnapshot,
+  mergeLiveLogsIntoArchive,
+  subscribeTelemetryArchive,
+  syncFullTelemetryArchive
+} from '../utils/telemetryArchive';
+
+import {
+  VALID_KEY_HASHES,
+  computeClearanceHash,
+  computeStaticSessionProof,
+  getPersistedAdminToken,
+  persistAdminToken,
+  clearPersistedAdminToken,
+  validatePersistedAdminToken,
+  isAuthorizedFirebaseUser,
+  persistTelemetryHint,
+} from '../utils/telemetryAuth';
 
 interface TelemetryLog {
+  id?: string;
   timestamp: string;
-  type: 'unique' | 'repeat';
+  type: 'unique' | 'repeat' | 'click' | string;
   slug: string;
   visitorId: string;
+  os?: string;
+  browser?: string;
+  target?: string;
+  page?: string;
+  category?: string;
 }
 
 interface SearchSummary {
   totalLogs: number;
   uniqueCount: number;
   repeatCount: number;
+  clickCount: number;
   matchedNodes: string[];
   newestDate?: string;
   oldestDate?: string;
   topTarget?: { title: string; count: number };
+  device?: string;
 }
 
 interface StatsData {
@@ -58,34 +117,85 @@ interface StatsModalProps {
   isOpen: boolean;
   onClose: () => void;
   articles: Array<{ slug: string; title: string }>;
+  activeSlug?: string;
+  onAuthStateSync?: (authorized: boolean) => void;
+  onSessionUnlockedChange?: (unlocked: boolean) => void;
+  onJumpToSlug?: (slug: string) => void;
 }
 
-export default function StatsModal({ isOpen, onClose, articles }: StatsModalProps) {
+const MAIN_TABS = ['telemetry', 'radians', 'cursors'] as const;
+type MainTab = (typeof MAIN_TABS)[number];
+
+export default function StatsModal({
+  isOpen,
+  onClose,
+  articles,
+  activeSlug = 'home',
+  onAuthStateSync,
+  onSessionUnlockedChange,
+  onJumpToSlug,
+}: StatsModalProps) {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isSandbox, setIsSandbox] = useState(false);
+
   const [retryCount, setRetryCount] = useState(0);
-  const [logFilter, setLogFilter] = useState<'all' | 'unique' | 'repeat'>('all');
+  const [logFilter, setLogFilter] = useState<'all' | 'unique' | 'repeat' | 'click'>('all');
   const [showAllTargets, setShowAllTargets] = useState(false);
+  const [activeMobileTab, setActiveMobileTab] = useState<'overview' | 'stream'>('overview');
+  const [activeMainTab, setActiveMainTab] = useState<MainTab>('telemetry');
+
+  const handlePrevMainTab = () => {
+    setActiveMainTab(prev => {
+      const idx = MAIN_TABS.indexOf(prev);
+      return MAIN_TABS[(idx - 1 + MAIN_TABS.length) % MAIN_TABS.length];
+    });
+  };
+
+  const handleNextMainTab = () => {
+    setActiveMainTab(prev => {
+      const idx = MAIN_TABS.indexOf(prev);
+      return MAIN_TABS[(idx + 1) % MAIN_TABS.length];
+    });
+  };
   const [isDeviceIgnored, setIsDeviceIgnored] = useState<boolean>(() => {
     return localStorage.getItem('wiki_telemetry_ignore_device') === 'true';
   });
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(() => {
+    const saved = localStorage.getItem('wiki_telemetry_fullscreen');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(prev => {
+      const next = !prev;
+      localStorage.setItem('wiki_telemetry_fullscreen', String(next));
+      return next;
+    });
+  };
 
   // User ID database search engine state
-  const [searchUserId, setSearchUserId] = useState<string>('');
-  const [searchResults, setSearchResults] = useState<TelemetryLog[] | null>(null);
+  const [searchUserId, setSearchUserId] = useState('');
+  const [pageSearchQuery, setPageSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<TelemetryLog[] | null>(null);
   const [searchSummary, setSearchSummary] = useState<SearchSummary | null>(null);
-  const searchCacheRef = useRef<Map<string, TelemetryLog[]>>(new Map());
+  const searchCacheRef = useRef<Map<string, { logs: TelemetryLog[]; cachedAt: number }>>(new Map());
+  const targetedResultsRef = useRef<Map<string, TelemetryLog[]>>(new Map());
+  const latestLogsRef = useRef<TelemetryLog[]>([]);
+  const latestPageViewKeysRef = useRef<string[]>([]);
+  const [archiveStatus, setArchiveStatus] = useState<ArchiveSyncStatus>(() => getArchiveSnapshot().status);
+  const [archiveTick, setArchiveTick] = useState(0);
+  const [displayLimit, setDisplayLimit] = useState(200);
 
   const currentVisitorId = useMemo(() => {
-    return localStorage.getItem('bonemeal_visitor_id') || localStorage.getItem('wiki_visitor_id') || 'unassigned';
+    return localStorage.getItem('wiki_visitor_id') || 'unassigned';
   }, [isOpen]);
 
   const currentVisitorIdShort = currentVisitorId.substring(0, 12);
+  const clientEnv = useMemo(() => detectClientEnvironment(), []);
 
   const handleStopTracking = () => {
     localStorage.setItem('wiki_telemetry_ignore_device', 'true');
@@ -101,32 +211,206 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
     setTimeout(() => setStatusNotice(null), 2800);
   };
 
+  // Auth & Admin verification state
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [tokenVerified, setTokenVerified] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [passkeyInput, setPasskeyInput] = useState('');
+  const [showPasskeyField, setShowPasskeyField] = useState(false);
+  const [adminToken, setAdminToken] = useState<string | null>(() => getPersistedAdminToken());
+
+  // Monitor Firebase Auth state
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setAuthChecking(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Cryptographically validate persisted token without wiping it on transient offline/network errors
+  useEffect(() => {
+    let cancelled = false;
+
+    const validateStoredToken = async () => {
+      if (!adminToken) {
+        setTokenVerified(false);
+        return;
+      }
+
+      const { valid, definitive } = await validatePersistedAdminToken(adminToken);
+      if (cancelled) return;
+
+      if (valid) {
+        persistAdminToken(adminToken);
+        setTokenVerified(true);
+      } else if (definitive) {
+        clearPersistedAdminToken();
+        setAdminToken(null);
+        setTokenVerified(false);
+      }
+    };
+
+    void validateStoredToken();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminToken]);
+
+  // Determine if currently authenticated user is an authorized admin
+  const isAuthorized = useMemo(() => {
+    if (tokenVerified) return true;
+    return isAuthorizedFirebaseUser(currentUser);
+  }, [currentUser, tokenVerified]);
+
+  useEffect(() => {
+    onAuthStateSync?.(isAuthorized);
+    if (isAuthorized) {
+      persistTelemetryHint(true);
+      onSessionUnlockedChange?.(true);
+    }
+    return () => {
+      onAuthStateSync?.(false);
+    };
+  }, [isAuthorized, onAuthStateSync, onSessionUnlockedChange]);
+
+  const handleVerifyPasskey = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmedKey = passkeyInput.trim();
+    if (!trimmedKey) return;
+
+    // Client-side brute-force lockout guard (also enforced server-side)
+    try {
+      const lockRaw = sessionStorage.getItem('wiki_auth_lock');
+      if (lockRaw) {
+        const lockData = JSON.parse(lockRaw);
+        if (lockData.lockUntil && Date.now() < lockData.lockUntil) {
+          setAuthError('Too many unauthorized attempts. Terminal locked for 15 minutes.');
+          return;
+        }
+      }
+    } catch {}
+
+    setIsSigningIn(true);
+    setAuthError(null);
+
+    const recordClientFailure = () => {
+      try {
+        const raw = sessionStorage.getItem('wiki_auth_lock');
+        const state = raw ? JSON.parse(raw) : { count: 0, lockUntil: 0 };
+        state.count = (state.count || 0) + 1;
+        if (state.count >= 5) {
+          state.lockUntil = Date.now() + 15 * 60 * 1000;
+        }
+        sessionStorage.setItem('wiki_auth_lock', JSON.stringify(state));
+      } catch {}
+    };
+
+    try {
+      // 1. Submit clearance key to server-side authentication API
+      const res = await fetch('/api/telemetry/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: trimmedKey })
+      });
+
+      const contentType = res.headers.get('content-type') || '';
+      if (res.status === 404 || res.status === 405 || !contentType.includes('application/json')) {
+        throw new Error('Static deployment mode (no JSON API)');
+      }
+
+      const data = await res.json();
+      if (res.ok && data.token) {
+        sessionStorage.removeItem('wiki_auth_lock');
+        persistAdminToken(data.token);
+        setAdminToken(data.token);
+        setTokenVerified(true);
+        setPasskeyInput('');
+        setAuthError(null);
+      } else {
+        setAuthError(data.error || 'UNAUTHORIZED ACCESS: Invalid Clearance Key.');
+      }
+    } catch {
+      // Fallback for static deployments (Cloudflare Pages / Vercel / GitHub Pages)
+      try {
+        const hash = await computeClearanceHash(trimmedKey);
+        if (VALID_KEY_HASHES.includes(hash)) {
+          const proof = await computeStaticSessionProof(hash);
+          sessionStorage.removeItem('wiki_auth_lock');
+          persistAdminToken(proof);
+          setAdminToken(proof);
+          setTokenVerified(true);
+          setPasskeyInput('');
+          setAuthError(null);
+        } else {
+          recordClientFailure();
+          setAuthError('UNAUTHORIZED ACCESS: Invalid Clearance Key.');
+        }
+      } catch {
+        setAuthError('ERROR VERIFYING KEY');
+      }
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleGitHubSignIn = async () => {
+    setIsSigningIn(true);
+    setAuthError(null);
+    try {
+      await signInWithPopup(auth, githubProvider);
+    } catch (err: any) {
+      console.error("Sign-in failure", err);
+      setAuthError(err?.message || "Failed to authenticate with GitHub");
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    clearPersistedAdminToken();
+    setAdminToken(null);
+    setTokenVerified(false);
+    onSessionUnlockedChange?.(false);
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Sign out error", err);
+    }
+  };
+
   // Log terminal open event to telemetry trace stream
   const hasLoggedOpenRef = useRef(false);
+
   useEffect(() => {
     if (!isOpen) {
       hasLoggedOpenRef.current = false;
       return;
     }
+
     if (hasLoggedOpenRef.current) return;
     hasLoggedOpenRef.current = true;
 
     const recordTerminalAccess = async () => {
       try {
+        // Abort if device tracking is disabled
         if (localStorage.getItem('wiki_telemetry_ignore_device') === 'true') {
           return;
         }
 
-        let visitorId = localStorage.getItem('bonemeal_visitor_id') || localStorage.getItem('wiki_visitor_id');
+        let visitorId = localStorage.getItem('wiki_visitor_id');
         if (!visitorId) {
           visitorId = 'surv_' + Math.random().toString(36).substring(2, 11) + Math.random().toString(36).substring(2, 11);
-          localStorage.setItem('bonemeal_visitor_id', visitorId);
+          localStorage.setItem('wiki_visitor_id', visitorId);
         }
+
         const shortVisitorId = visitorId.substring(0, 12);
 
         const recordLocalTerminal = (isUnique: boolean) => {
           try {
-            const raw = localStorage.getItem('bonemeal_wiki_stats') || localStorage.getItem('local_wiki_stats');
+            const raw = localStorage.getItem('local_wiki_stats');
             let localData: StatsData | null = null;
             if (raw) {
               localData = JSON.parse(raw);
@@ -140,39 +424,48 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
                 logs: []
               };
             }
+
             localData.totalCount = (localData.totalCount || 0) + 1;
             if (isUnique) {
               localData.uniqueCount = (localData.uniqueCount || 0) + 1;
             } else {
               localData.repeatCount = (localData.repeatCount || 0) + 1;
             }
+
             if (!localData.pageViews) localData.pageViews = {};
             localData.pageViews['telemetry-terminal'] = (localData.pageViews['telemetry-terminal'] || 0) + 1;
+
             if (!localData.logs) localData.logs = [];
             localData.logs.unshift({
               timestamp: new Date().toISOString(),
               type: isUnique ? 'unique' : 'repeat',
               slug: 'telemetry-terminal',
-              visitorId: shortVisitorId
+              visitorId: shortVisitorId,
+              os: clientEnv.os,
+              browser: clientEnv.browser
             });
+
             if (localData.logs.length > 50) {
               localData.logs = localData.logs.slice(0, 50);
             }
-            localStorage.setItem('bonemeal_wiki_stats', JSON.stringify(localData));
+
+            localStorage.setItem('local_wiki_stats', JSON.stringify(localData));
             setStats(localData);
           } catch (e) {
             console.error('Failed to log terminal open event to local sandbox', e);
           }
         };
 
+        // Optimistic UI emission: append event to local trace immediately so terminal shows 0ms latency
         const optimisticType = localStorage.getItem('wiki_visitor_established') === 'true' ? 'repeat' : 'unique';
         const optimisticEntry: TelemetryLog = {
           timestamp: new Date().toISOString(),
           type: optimisticType,
           slug: 'telemetry-terminal',
-          visitorId: shortVisitorId
+          visitorId: shortVisitorId,
+          os: clientEnv.os,
+          browser: clientEnv.browser
         };
-
         setStats(prev => {
           if (!prev) return prev;
           const currentLogs = prev.logs || [];
@@ -188,30 +481,36 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
         });
 
         if (hasConfig) {
+          // Asynchronously dispatch writes in parallel without blocking the UI thread
           (async () => {
             try {
-              const fullKey = `bonemeal_${visitorId}`;
-              const visitorDocRef = doc(db, 'visitors', fullKey);
+              const visitorDocRef = doc(db, 'visitors', visitorId);
               const isKnownLocally = localStorage.getItem('wiki_visitor_established') === 'true';
               let isUnique = false;
+
               if (!isKnownLocally) {
                 const visitorSnapshot = await getDoc(visitorDocRef);
                 isUnique = !visitorSnapshot.exists();
                 localStorage.setItem('wiki_visitor_established', 'true');
               }
+
               const visitorWrite = isUnique
                 ? setDoc(visitorDocRef, {
-                    wiki: 'super_bonemeal',
                     firstVisit: serverTimestamp(),
-                    lastVisit: serverTimestamp()
+                    lastVisit: serverTimestamp(),
+                    os: clientEnv.os,
+                    browser: clientEnv.browser,
+                    deviceType: clientEnv.deviceType
                   })
                 : setDoc(visitorDocRef, {
-                    lastVisit: serverTimestamp()
+                    lastVisit: serverTimestamp(),
+                    os: clientEnv.os,
+                    browser: clientEnv.browser,
+                    deviceType: clientEnv.deviceType
                   }, { merge: true });
 
-              const statsDocRef = doc(db, 'stats', 'super_bonemeal');
+              const statsDocRef = doc(db, 'stats', 'global');
               const statsWrite = setDoc(statsDocRef, {
-                wiki: 'super_bonemeal',
                 totalCount: increment(1),
                 uniqueCount: isUnique ? increment(1) : increment(0),
                 repeatCount: !isUnique ? increment(1) : increment(0),
@@ -219,29 +518,24 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
               }, { merge: true });
 
               const logWrite = addDoc(collection(db, 'telemetry_logs'), {
-                wiki: 'super_bonemeal',
                 timestamp: serverTimestamp(),
                 type: isUnique ? 'unique' : 'repeat',
                 slug: 'telemetry-terminal',
-                visitorId: shortVisitorId
+                visitorId: shortVisitorId,
+                os: clientEnv.os,
+                browser: clientEnv.browser
               });
 
+              // Execute all three writes concurrently over a single batched window
               await Promise.all([visitorWrite, statsWrite, logWrite]);
             } catch (err) {
-              console.warn('Firebase terminal logging failed, using local fallback', err);
+              console.warn('Firebase terminal logging failed, using local sandbox fallback', err);
               recordLocalTerminal(false);
             }
           })();
         } else {
-          const raw = localStorage.getItem('bonemeal_wiki_stats') || localStorage.getItem('local_wiki_stats');
-          let hasVisited = false;
-          if (raw) {
-            try {
-              const parsed = JSON.parse(raw);
-              hasVisited = parsed.logs?.some((l: TelemetryLog) => l.visitorId === shortVisitorId);
-            } catch (e) {}
-          }
-          recordLocalTerminal(!hasVisited);
+          // Firebase not configured — skip local recording
+          console.warn('Firebase not configured; skipping terminal open telemetry.');
         }
       } catch (err) {
         console.error('Error logging terminal telemetry event:', err);
@@ -264,11 +558,16 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
   }, [isOpen, onClose]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !isAuthorized) {
+      setStats(null);
+      return;
+    }
 
-    const cachedStats = localStorage.getItem('cached_bonemeal_telemetry_stats') || 
-                        localStorage.getItem('bonemeal_wiki_stats') || 
-                        localStorage.getItem('local_wiki_stats');
+    // Clear any stale sandbox mock data from localStorage
+    localStorage.removeItem('local_wiki_stats');
+
+    // Zero-delay rehydration: instantly render from local cache if available
+    const cachedStats = localStorage.getItem('cached_telemetry_stats');
     if (cachedStats) {
       try {
         setStats(JSON.parse(cachedStats));
@@ -279,63 +578,33 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
     } else {
       setLoading(true);
     }
+
     setError(null);
-    setIsSandbox(false);
 
     let statsUnsubscribe: () => void = () => {};
     let logsUnsubscribe: () => void = () => {};
 
-    const enableSandboxFallback = () => {
-      const localStatsStr = localStorage.getItem('bonemeal_wiki_stats') || localStorage.getItem('local_wiki_stats');
-      if (localStatsStr) {
-        try {
-          setStats(JSON.parse(localStatsStr));
-          setIsSandbox(true);
-        } catch (e) {
-          setError('Failed to parse local stats database.');
-        }
-      } else {
-        const localId = localStorage.getItem('bonemeal_visitor_id') || 'surv_local';
-        const defaultStats: StatsData = {
-          uniqueCount: 16,
-          repeatCount: 28,
-          totalCount: 44,
-          pageViews: { 'home': 22, 'items': 15, 'versions': 7 },
-          logs: [
-            {
-              timestamp: new Date().toISOString(),
-              type: 'unique' as const,
-              slug: 'home',
-              visitorId: localId.substring(0, 12)
-            },
-            {
-              timestamp: new Date(Date.now() - 600000).toISOString(),
-              type: 'repeat' as const,
-              slug: 'items',
-              visitorId: 'surv_f2910a'
-            },
-            {
-              timestamp: new Date(Date.now() - 1800000).toISOString(),
-              type: 'unique' as const,
-              slug: 'versions',
-              visitorId: 'surv_f2910a'
-            }
-          ]
-        };
-        localStorage.setItem('bonemeal_wiki_stats', JSON.stringify(defaultStats));
-        setStats(defaultStats);
-        setIsSandbox(true);
-      }
-      setLoading(false);
-    };
-
     if (!hasConfig) {
-      enableSandboxFallback();
+      setError('Firebase is not configured. Cannot connect to live database.');
+      setLoading(false);
       return;
     }
 
+    const formatFirestoreError = (err: unknown, fallback: string) => {
+      const code = (err as { code?: string })?.code || '';
+      const msg = err instanceof Error ? err.message : String(err || '');
+      if (code === 'resource-exhausted' || /quota/i.test(msg)) {
+        return 'Firestore daily free-tier read quota exceeded. Quota resets tomorrow; check the Firebase Console Firestore usage tab.';
+      }
+      if (code === 'permission-denied') {
+        return 'Firestore permission denied. Check firestore.rules deployment.';
+      }
+      return msg ? `${fallback} (${code ? `${code}: ` : ''}${msg})` : fallback;
+    };
+
     try {
-      statsUnsubscribe = onSnapshot(doc(db, 'stats', 'super_bonemeal'), (statsDoc) => {
+      // 1. Listen to global stats doc
+      statsUnsubscribe = onSnapshot(doc(db, 'stats', 'global'), (statsDoc) => {
         if (statsDoc.exists()) {
           const data = statsDoc.data();
           const pageViews: Record<string, number> = {};
@@ -360,12 +629,11 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
               logs: prev?.logs || []
             };
             try {
-              localStorage.setItem('cached_bonemeal_telemetry_stats', JSON.stringify(nextStats));
+              localStorage.setItem('cached_telemetry_stats', JSON.stringify(nextStats));
             } catch {}
             return nextStats;
           });
-          setIsSandbox(false);
-        } else {
+        } else {          // Document does not exist yet (first time initialization)
           setStats(prev => ({
             uniqueCount: 0,
             repeatCount: 0,
@@ -373,14 +641,15 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
             pageViews: {},
             logs: prev?.logs || []
           }));
-          setIsSandbox(false);
         }
         setLoading(false);
       }, (err) => {
-        console.warn("Error listening to Firestore global stats, enabling local sandbox fallback.", err);
-        enableSandboxFallback();
+        console.error("Firestore global stats error:", err);
+        setError(formatFirestoreError(err, 'Live database connection failed.'));
+        setLoading(false);
       });
 
+      // 2. Listen to logs query
       const logsQuery = query(
         collection(db, 'telemetry_logs'),
         orderBy('timestamp', 'desc'),
@@ -389,8 +658,8 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
 
       logsUnsubscribe = onSnapshot(logsQuery, (snapshot) => {
         const logs: TelemetryLog[] = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
+        snapshot.forEach((doc) => {
+          const data = doc.data();
           let tsStr = new Date().toISOString();
           if (data.timestamp) {
             if (typeof data.timestamp.toDate === 'function') {
@@ -402,85 +671,128 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
             }
           }
           logs.push({
+            id: doc.id,
             timestamp: tsStr,
             type: data.type || 'repeat',
             slug: data.slug || 'home',
-            visitorId: data.visitorId || 'unknown'
+            visitorId: data.visitorId || 'unknown',
+            os: data.os,
+            browser: data.browser,
+            target: data.target,
+            page: data.page,
+            category: data.category
           });
         });
-
+        mergeLiveLogsIntoArchive(logs);
         setStats(prev => {
-          if (!prev) {
-            return {
-              uniqueCount: 0,
-              repeatCount: 0,
-              totalCount: logs.length,
-              pageViews: {},
-              logs
-            };
-          }
-          return {
+          const nextStats = !prev ? {
+            uniqueCount: 0,
+            repeatCount: 0,
+            totalCount: 0,
+            pageViews: {},
+            logs
+          } : {
             ...prev,
             logs
           };
+          try {
+            localStorage.setItem('cached_telemetry_stats', JSON.stringify(nextStats));
+          } catch {}
+          return nextStats;
         });
       }, (err) => {
-        console.warn("Error listening to logs stream, using local logs fallback.", err);
+        console.error("Firestore logs error:", err);
+        setError(formatFirestoreError(err, 'Live telemetry stream connection failed.'));
+        setLoading(false);
       });
 
     } catch (err) {
-      console.warn("Failed to attach Firestore snapshot listeners", err);
-      enableSandboxFallback();
+      console.error("Firebase execution error:", err);
+      setError(formatFirestoreError(err, 'Failed to connect to live database.'));
+      setLoading(false);
     }
 
     return () => {
       statsUnsubscribe();
       logsUnsubscribe();
     };
-  }, [isOpen, retryCount]);
+  }, [isOpen, isAuthorized, retryCount]);
 
   const handleManualRefresh = () => {
-    setIsRefreshing(true);
-    if (isSandbox) {
-      const localStatsStr = localStorage.getItem('bonemeal_wiki_stats') || localStorage.getItem('local_wiki_stats');
-      if (localStatsStr) {
-        try {
-          setStats(JSON.parse(localStatsStr));
-        } catch (e) {
-          console.error(e);
-        }
-      }
+    searchCacheRef.current.clear();
+    targetedResultsRef.current.clear();
+    if (hasConfig) {
+      void syncFullTelemetryArchive(db, { forceDelta: true });
     }
+    setIsRefreshing(true);
     setTimeout(() => setIsRefreshing(false), 600);
   };
 
-  const getArticleTitle = (slug: string) => {
+  const getArticleTitle = (slug: string, target?: string) => {
+    if (target) return target;
     if (slug === 'telemetry-terminal' || slug === 'terminal') {
       return 'Telemetry Terminal';
     }
+    if (slug.includes(':')) {
+      const parts = slug.split(':');
+      const pageSlug = parts[0];
+      const itemKey = parts.slice(1).join(':');
+      const pageArticle = articles.find(a => a.slug === pageSlug);
+      const pageTitle = pageArticle ? pageArticle.title : (pageSlug.charAt(0).toUpperCase() + pageSlug.slice(1));
+      const formattedItem = itemKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return `${formattedItem} (${pageTitle})`;
+    }
     const article = articles.find(a => a.slug === slug);
     if (article) return article.title;
+    // Format fallback neatly
     return slug.charAt(0).toUpperCase() + slug.slice(1).replace(/-/g, ' ');
   };
 
-  // Compute top visited pages breakdown
+  const formatLogDisplay = (log: TelemetryLog) => {
+    if (log.slug === 'telemetry-terminal' || log.slug === 'terminal') {
+      return { main: 'Telemetry Terminal', sub: null };
+    }
+    if (log.type === 'click' && log.target) {
+      let main = log.target;
+      // Strip legacy redundant "(page: ...)"
+      main = main.replace(/\s*\(page:\s*[^)]+\)/gi, '').trim();
+      const pageTitle = log.page ? getArticleTitle(log.page) : null;
+      const sub = pageTitle && !main.toLowerCase().includes(pageTitle.toLowerCase()) ? pageTitle : null;
+      return { main, sub };
+    }
+    const title = getArticleTitle(log.slug);
+    return { main: title, sub: null };
+  };
+
+  // Compute top visited pages breakdown with search filter
   const { topPages, totalTargetsCount } = useMemo(() => {
     if (!stats) return { topPages: [], totalTargetsCount: 0 };
     
+    // Check if stats.pageViews has keys
     const viewsMap: Record<string, number> = { ...(stats.pageViews || {}) };
+
+    // If pageViews is empty but we have logs, calculate distribution from logs
     if (Object.keys(viewsMap).length === 0 && stats.logs.length > 0) {
       stats.logs.forEach(log => {
         viewsMap[log.slug] = (viewsMap[log.slug] || 0) + 1;
       });
     }
 
-    const sorted = Object.entries(viewsMap)
+    let sorted = Object.entries(viewsMap)
       .map(([slug, count]) => ({
         slug,
         title: getArticleTitle(slug),
         count
       }))
       .sort((a, b) => b.count - a.count);
+
+    const q = pageSearchQuery.trim().toLowerCase();
+    if (q) {
+      sorted = sorted.filter(p => 
+        p.title.toLowerCase().includes(q) || 
+        p.slug.toLowerCase().includes(q)
+      );
+    }
 
     const maxCount = sorted.length > 0 ? Math.max(...sorted.map(p => p.count), 1) : 1;
 
@@ -491,10 +803,10 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
     }));
 
     return {
-      topPages: showAllTargets ? ranked : ranked.slice(0, 6),
+      topPages: (showAllTargets || q) ? ranked : ranked.slice(0, 6),
       totalTargetsCount: ranked.length
     };
-  }, [stats, articles, showAllTargets]);
+  }, [stats, articles, showAllTargets, pageSearchQuery]);
 
   const computeSearchSummary = (results: TelemetryLog[]) => {
     if (results.length === 0) {
@@ -502,6 +814,7 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
         totalLogs: 0,
         uniqueCount: 0,
         repeatCount: 0,
+        clickCount: 0,
         matchedNodes: []
       });
       return;
@@ -510,10 +823,12 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
     const targetCounts: Record<string, number> = {};
     let uniqueCount = 0;
     let repeatCount = 0;
+    let clickCount = 0;
 
     results.forEach(r => {
       targetCounts[r.slug] = (targetCounts[r.slug] || 0) + 1;
-      if (r.type === 'unique') uniqueCount++;
+      if (r.type === 'click') clickCount++;
+      else if (r.type === 'unique') uniqueCount++;
       else repeatCount++;
     });
 
@@ -526,20 +841,84 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
       }
     });
 
+    const latestWithDevice = results.find(r => r.browser || r.os);
+    const detectedDevice = latestWithDevice 
+      ? `${latestWithDevice.browser || 'Browser'}${latestWithDevice.os ? ` on ${latestWithDevice.os}` : ''}`
+      : (nodes.some(n => n.toLowerCase().includes(currentVisitorIdShort.toLowerCase())) ? `${clientEnv.browser} on ${clientEnv.os}` : undefined);
+
     setSearchSummary({
       totalLogs: results.length,
       uniqueCount,
       repeatCount,
+      clickCount,
       matchedNodes: nodes,
       newestDate: results[0]?.timestamp,
       oldestDate: results[results.length - 1]?.timestamp,
-      topTarget: topSlug ? { title: getArticleTitle(topSlug), count: maxCount } : undefined
+      topTarget: topSlug ? { title: getArticleTitle(topSlug), count: maxCount } : undefined,
+      device: detectedDevice
     });
   };
 
-  // User ID database search engine effect with automatic debounce
   useEffect(() => {
-    const trimmed = searchUserId.trim().toLowerCase();
+    latestLogsRef.current = stats?.logs || [];
+    latestPageViewKeysRef.current = Object.keys(stats?.pageViews || {});
+  }, [stats]);
+
+  // Hydrate and subscribe to the persistent full-history telemetry archive while modal is open
+  useEffect(() => {
+    if (!isOpen || !isAuthorized) return;
+    const unsubscribe = subscribeTelemetryArchive((_, status) => {
+      setArchiveStatus(status);
+      setArchiveTick(prev => prev + 1);
+    });
+    void ensureArchiveHydrated();
+    return () => unsubscribe();
+  }, [isOpen, isAuthorized]);
+
+  // Reset rendered list window when search query or type filter changes
+  useEffect(() => {
+    setDisplayLimit(200);
+  }, [searchUserId, logFilter]);
+
+  const buildSearchableText = (l: {
+    visitorId?: string;
+    os?: string;
+    browser?: string;
+    slug?: string;
+    target?: string;
+    page?: string;
+    category?: string;
+    type?: string;
+  }) => {
+    const slug = l.slug || 'home';
+    const displayTitle = getArticleTitle(slug, l.target);
+    const pageTitle = l.page ? getArticleTitle(l.page) : '';
+    return `${l.visitorId || ''} ${l.os || ''} ${l.browser || ''} ${slug} ${l.target || ''} ${l.page || ''} ${l.category || ''} ${l.type || ''} ${displayTitle} ${pageTitle}`.toLowerCase();
+  };
+
+  const getLogDedupeKey = (l: TelemetryLog) =>
+    l.id || `${l.timestamp}::${l.visitorId}::${l.slug}::${l.type}::${l.target || ''}`;
+
+  const mergeAndSortLogs = (primary: TelemetryLog[], secondary: TelemetryLog[]) => {
+    const merged = new Map<string, TelemetryLog>();
+    for (const item of primary) {
+      merged.set(getLogDedupeKey(item), item);
+    }
+    for (const item of secondary) {
+      const key = getLogDedupeKey(item);
+      if (!merged.has(key)) {
+        merged.set(key, item);
+      }
+    }
+    return Array.from(merged.values()).sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  };
+
+  // Instant search across ALL indexed archive logs + live stream + targeted results (recomputes live as batches stream in)
+  useEffect(() => {
+    const rawTrimmed = searchUserId.trim();
+    const trimmed = rawTrimmed.toLowerCase();
     if (!trimmed) {
       setSearchResults(null);
       setSearchSummary(null);
@@ -547,84 +926,176 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
       return;
     }
 
-    if (searchCacheRef.current.has(trimmed)) {
-      const cached = searchCacheRef.current.get(trimmed)!;
-      setSearchResults(cached);
-      computeSearchSummary(cached);
+    const tokens = trimmed.split(/[\s·on\-_/]+/).filter(t => t.length > 0);
+    const matchesTokens = (text: string) =>
+      tokens.length === 0 ? text.includes(trimmed) : tokens.every(token => text.includes(token));
+
+    const archiveLogs = Array.from(getArchiveSnapshot().logs.values());
+    const liveLogs = latestLogsRef.current;
+    const targetedLogs = targetedResultsRef.current.get(trimmed) || [];
+
+    const combinedPool = mergeAndSortLogs(
+      mergeAndSortLogs(archiveLogs, targetedLogs),
+      liveLogs
+    );
+
+    const matched = combinedPool.filter(l => matchesTokens(buildSearchableText(l)));
+    setSearchResults(matched);
+    computeSearchSummary(matched);
+  }, [searchUserId, archiveTick, articles]);
+
+  // Trigger full-database cursor-paginated archive sync + instant targeted query on search input
+  useEffect(() => {
+    const rawTrimmed = searchUserId.trim();
+    const trimmed = rawTrimmed.toLowerCase();
+    if (!trimmed) {
       setIsSearching(false);
       return;
     }
 
+    if (!hasConfig) {
+      setIsSearching(false);
+      return;
+    }
+
+    // Start or continue background full-database backfill + delta sync
+    void syncFullTelemetryArchive(db);
+
+    if (trimmed.length < 2 || getArchiveSnapshot().status.isComplete) {
+      setIsSearching(false);
+      return;
+    }
+
+    const tokens = trimmed.split(/[\s·on\-_/]+/).filter(t => t.length > 0);
+    const matchesTokens = (text: string) =>
+      tokens.length === 0 ? text.includes(trimmed) : tokens.every(token => text.includes(token));
+
+    let isCancelled = false;
     setIsSearching(true);
     const debounceTimer = setTimeout(async () => {
       try {
-        let results: TelemetryLog[] = [];
-        if (hasConfig) {
-          const prefixes = [trimmed];
-          if (!trimmed.startsWith('surv_') && !trimmed.includes('_')) {
-            prefixes.push('surv_' + trimmed);
-          }
-          const isGeneric = trimmed === 'surv' || trimmed === 'surv_';
-          const logsMap = new Map<string, TelemetryLog>();
+        const logsMap = new Map<string, TelemetryLog>();
 
-          for (const p of prefixes) {
-            let q = query(
-              collection(db, 'telemetry_logs'),
-              where('visitorId', '>=', p),
-              where('visitorId', '<=', p + '\uf8ff')
-            );
-            if (isGeneric) {
-              q = query(q, limit(250));
+        const addDocToMap = (id: string, data: any) => {
+          let tsStr = new Date().toISOString();
+          if (data.timestamp) {
+            if (typeof data.timestamp.toDate === 'function') {
+              tsStr = data.timestamp.toDate().toISOString();
+            } else if (data.timestamp.seconds) {
+              tsStr = new Date(data.timestamp.seconds * 1000).toISOString();
+            } else {
+              tsStr = new Date(data.timestamp).toISOString();
             }
-            const snap = await getDocs(q);
-            snap.forEach(docSnap => {
-              const data = docSnap.data();
-              let tsStr = new Date().toISOString();
-              if (data.timestamp) {
-                if (typeof data.timestamp.toDate === 'function') {
-                  tsStr = data.timestamp.toDate().toISOString();
-                } else if (data.timestamp.seconds) {
-                  tsStr = new Date(data.timestamp.seconds * 1000).toISOString();
-                } else {
-                  tsStr = new Date(data.timestamp).toISOString();
-                }
-              }
-              logsMap.set(docSnap.id, {
-                timestamp: tsStr,
-                type: data.type || 'repeat',
-                slug: data.slug || 'home',
-                visitorId: data.visitorId || 'unknown'
-              });
-            });
           }
+          logsMap.set(id, {
+            id,
+            timestamp: tsStr,
+            type: data.type || 'repeat',
+            slug: data.slug || 'home',
+            visitorId: data.visitorId || 'unknown',
+            os: data.os,
+            browser: data.browser,
+            target: data.target,
+            page: data.page,
+            category: data.category
+          });
+        };
 
-          results = Array.from(logsMap.values()).sort(
-            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        const knownSlugs = new Set<string>([
+          ...articles.map(a => a.slug),
+          ...latestPageViewKeysRef.current,
+          'telemetry-terminal',
+          'terminal',
+          'rot-lab'
+        ]);
+        const matchedSlugs = Array.from(knownSlugs)
+          .filter(slug => {
+            const title = getArticleTitle(slug).toLowerCase();
+            const slugLower = slug.toLowerCase();
+            return matchesTokens(`${slugLower} ${title}`);
+          })
+          .slice(0, 15);
+
+        const queries = [];
+        if (matchedSlugs.length > 0) {
+          queries.push(
+            getDocs(query(collection(db, 'telemetry_logs'), where('slug', 'in', matchedSlugs), limit(500)))
           );
-        } else {
-          const localLogs = stats?.logs || [];
-          results = localLogs.filter(l => l.visitorId.toLowerCase().includes(trimmed));
+          queries.push(
+            getDocs(query(collection(db, 'telemetry_logs'), where('page', 'in', matchedSlugs), limit(500)))
+          );
         }
 
-        searchCacheRef.current.set(trimmed, results);
-        setSearchResults(results);
-        computeSearchSummary(results);
+        if (!trimmed.includes(' ') && trimmed.length >= 4) {
+          queries.push(
+            getDocs(
+              query(
+                collection(db, 'telemetry_logs'),
+                where('visitorId', '>=', rawTrimmed),
+                where('visitorId', '<=', rawTrimmed + '\uf8ff'),
+                limit(500)
+              )
+            )
+          );
+        }
+
+        if (queries.length > 0) {
+          const settled = await Promise.allSettled(queries);
+          settled.forEach(outcome => {
+            if (outcome.status === 'fulfilled') {
+              outcome.value.forEach(docSnap => {
+                const data = docSnap.data();
+                if (matchesTokens(buildSearchableText(data))) {
+                  addDocToMap(docSnap.id, data);
+                }
+              });
+            }
+          });
+        }
+
+        if (isCancelled) return;
+        const targeted = Array.from(logsMap.values());
+        targetedResultsRef.current.set(trimmed, targeted);
+        mergeLiveLogsIntoArchive(targeted);
+        setArchiveTick(prev => prev + 1);
       } catch (err) {
-        console.error('Error querying full Firestore history:', err);
+        if (!isCancelled) {
+          console.error('Error querying targeted Firestore history:', err);
+        }
       } finally {
-        setIsSearching(false);
+        if (!isCancelled) {
+          setIsSearching(false);
+        }
       }
-    }, 220);
+    }, 200);
 
-    return () => clearTimeout(debounceTimer);
-  }, [searchUserId, hasConfig, stats]);
+    return () => {
+      isCancelled = true;
+      clearTimeout(debounceTimer);
+    };
+  }, [searchUserId, hasConfig, articles]);
 
+  // Active pool of logs: database search results or live stream
   const activeLogsPool = searchResults !== null ? searchResults : (stats?.logs || []);
 
+  // Filter logs by type
   const filteredLogs = useMemo(() => {
     if (logFilter === 'all') return activeLogsPool;
-    return activeLogsPool.filter(log => log.type === logFilter);
+    return activeLogsPool.filter(l => l.type === logFilter);
   }, [activeLogsPool, logFilter]);
+
+  const logCounts = useMemo(() => {
+    let unique = 0;
+    let repeat = 0;
+    let click = 0;
+    for (let i = 0; i < activeLogsPool.length; i++) {
+      const t = activeLogsPool[i].type;
+      if (t === 'unique') unique++;
+      else if (t === 'repeat') repeat++;
+      else if (t === 'click') click++;
+    }
+    return { unique, repeat, click };
+  }, [activeLogsPool]);
 
   const formatRelativeTime = (timestamp: string) => {
     try {
@@ -649,119 +1120,171 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5">
-        {/* Backdrop overlay with blur */}
+      <div className={`fixed inset-0 z-50 flex items-center justify-center ${
+        isFullscreen ? 'p-1 sm:p-2' : 'p-2 sm:p-5'
+      }`}>
+        {/* Clean, high-performance backdrop overlay */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.12 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/80 backdrop-blur-md cursor-pointer"
+          className="fixed inset-0 bg-black/85 cursor-pointer"
+          id="stats-modal-backdrop"
         />
 
-        {/* Modal Window */}
+        {/* Modal Window: Sleek Minimalist Dark HUD with Crisp Borders */}
         <motion.div 
-          initial={{ opacity: 0, scale: 0.95, y: 15 }}
+          initial={{ opacity: 0, scale: 0.98, y: 6 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 15 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-          className="relative w-full max-w-4xl max-h-[90vh] bg-[#120f0c] border border-[#2b2218] rounded-xl shadow-2xl flex flex-col overflow-hidden z-10"
+          exit={{ opacity: 0, scale: 0.98, y: 6 }}
+          transition={{ duration: 0.12, ease: 'easeOut' }}
+          className={`relative w-full bg-[#080c09] border border-[#1b261e] rounded-lg shadow-2xl overflow-hidden flex flex-col font-mono z-50 text-[#c8d4ca] will-change-transform ${
+            isFullscreen 
+              ? 'w-[98.5vw] h-[97vh] max-w-[98.5vw] max-h-[97vh]' 
+              : 'w-full max-w-6xl h-[92vh] sm:h-[88vh] max-h-[92vh] sm:max-h-[88vh]'
+          }`}
+          id="stats-modal-container"
         >
-          {/* Terminal Window Header */}
-          <div className="px-4 py-3 bg-[#17120e] border-b border-[#2b2118] flex items-center justify-between select-none">
-            <div className="flex items-center gap-3">
-              {/* Traffic light simulation with Click/Double-Click Telemetry Toggle */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleStopTracking}
-                  onDoubleClick={handleStopTracking}
-                  title="Double-click: Stop tracking (ignore this device)"
-                  className="p-1 -m-1 flex items-center justify-center cursor-pointer group"
-                  id="stats-btn-stop-tracking"
-                >
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full transition-all ${
-                      isDeviceIgnored 
-                        ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]' 
-                        : 'bg-red-500/35 group-hover:bg-red-500/80'
-                    }`}
-                  />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStatusNotice(`NODE: ${currentVisitorIdShort}`);
-                    setTimeout(() => setStatusNotice(null), 2800);
-                  }}
-                  className="p-1 -m-1 flex items-center justify-center cursor-pointer group"
-                  title="Telemetry Terminal Node"
-                  id="stats-btn-node-info"
-                >
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500/40 group-hover:bg-amber-500/80 transition-colors" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleResumeTracking}
-                  onDoubleClick={handleResumeTracking}
-                  title="Double-click: Resume tracking"
-                  className="p-1 -m-1 flex items-center justify-center cursor-pointer group"
-                  id="stats-btn-resume-tracking"
-                >
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full transition-all ${
-                      !isDeviceIgnored 
-                        ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' 
-                        : 'bg-emerald-500/35 group-hover:bg-emerald-500/80'
-                    }`}
-                  />
-                </button>
-              </div>
-              <div className="h-4 w-[1px] bg-[#2e241c]" />
-              <div className="flex items-center gap-2">
-                <Terminal className="w-3.5 h-3.5 text-[#d4b28c]" />
-                <span className="text-[11px] font-semibold tracking-wider text-[#dfc9ab] uppercase">
-                  SUPER BONE MEAL TELEMETRY TERMINAL
+          {/* Header - Minimalist Tactical HUD Bar */}
+          <div 
+            className="flex items-center justify-between px-3 sm:px-4 py-2 sm:py-2.5 bg-[#0b100d] border-b border-[#1b261e] select-none gap-2 cursor-default"
+          >
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              {isAuthorized ? (
+                <>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleStopTracking}
+                      title="Stop tracking (ignore this device)"
+                      className={`w-2.5 h-2.5 rounded-full transition-colors cursor-pointer ${
+                        isDeviceIgnored 
+                          ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.7)]' 
+                          : 'bg-red-500/35 hover:bg-red-500/75'
+                      }`}
+                    />
+                    <span
+                      className="w-2.5 h-2.5 rounded-full bg-amber-500/40" 
+                      title="Terminal indicator" 
+                    />
+                    <button
+                      type="button"
+                      onClick={handleResumeTracking}
+                      title="Resume tracking"
+                      className={`w-2.5 h-2.5 rounded-full transition-colors cursor-pointer ${
+                        !isDeviceIgnored 
+                          ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.7)]' 
+                          : 'bg-emerald-500/35 hover:bg-emerald-500/75'
+                      }`}
+                    />
+                  </div>
+                  <div className="h-4 w-[1px] bg-[#1e2a22] shrink-0" />
+                </>
+              ) : null}
+
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                <Terminal className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="text-xs sm:text-sm font-semibold tracking-wider text-[#a4c9ad] uppercase truncate">
+                  <span className="hidden sm:inline">BACKWOODS TELEMETRY TERMINAL</span>
+                  <span className="sm:hidden">TELEMETRY</span>
                 </span>
-                {statusNotice && (
-                  <span className={`text-[9px] px-2 py-0.5 rounded font-mono uppercase tracking-wider ${
-                    isDeviceIgnored
-                      ? 'text-red-300 bg-red-950/60 border border-red-800/60'
-                      : 'text-emerald-300 bg-emerald-950/60 border border-emerald-800/60'
-                  }`}>
-                    {statusNotice}
-                  </span>
+
+                {isAuthorized && (
+                  <>
+                    {/* Tab switch arrows: < > */}
+                    <div className="inline-flex items-center gap-0.5 bg-surface-alt border border-line rounded px-1 py-0.5 text-xs font-mono shrink-0 select-none ml-1">
+                      <button
+                        type="button"
+                        onClick={handlePrevMainTab}
+                        className="p-0.5 text-ink-subtle hover:text-accent-text hover:bg-surface rounded transition-colors cursor-pointer"
+                        title="Previous Tab (<)"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="text-[9px] sm:text-[10px] tracking-wider uppercase font-semibold text-accent-text px-1 border-x border-line whitespace-nowrap">
+                        {activeMainTab === 'telemetry'
+                          ? '01: TELEMETRY'
+                          : activeMainTab === 'radians'
+                            ? '02: LIVE RADIANS'
+                            : '03: LIVE CURSORS'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleNextMainTab}
+                        className="p-0.5 text-ink-subtle hover:text-accent-text hover:bg-surface rounded transition-colors cursor-pointer"
+                        title="Next Tab (>)"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {statusNotice && (
+                      <span className={`text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded font-mono uppercase tracking-wider shrink-0 font-bold ${
+                        isDeviceIgnored
+                          ? 'text-red-300 bg-red-950/80 border border-red-800'
+                          : 'text-emerald-300 bg-emerald-950/80 border border-emerald-800'
+                      }`}>
+                        <span className="hidden sm:inline">{statusNotice}</span>
+                        <span className="sm:hidden">{isDeviceIgnored ? 'HALTED' : 'ACTIVE'}</span>
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Mode indicator pill */}
-              {isSandbox ? (
-                <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded border border-amber-900/50 bg-amber-950/20 text-amber-300 text-[9px] tracking-wider uppercase font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  SANDBOX STORAGE
-                </div>
-              ) : (
-                <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded border border-[#6b5842] bg-[#241c14] text-[#dfc9ab] text-[9px] tracking-wider uppercase font-semibold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#dfc9ab] animate-pulse" />
-                  LIVE DATABASE LINK
-                </div>
-              )}
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              {isAuthorized ? (
+                <>
+                  {/* Mode indicator pill — always live */}
+                  <div className="hidden md:flex items-center gap-1.5 px-2 py-0.5 rounded border border-emerald-900/50 bg-emerald-950/20 text-emerald-400 text-[10px] tracking-wider uppercase font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    LIVE DB
+                  </div>
 
-              <div className="flex items-center gap-1.5 border-l border-[#2e241b] pl-3">
+                  {/* Sign out button */}
+                  <button
+                    onClick={handleSignOut}
+                    className="hidden sm:flex items-center gap-1 px-2 py-1 text-[10px] border border-red-900/50 bg-red-950/20 text-red-400 hover:bg-red-950/50 rounded transition-colors font-mono cursor-pointer"
+                    title="Sign Out"
+                  >
+                    <LogOut className="w-3 h-3" />
+                    <span>EXIT</span>
+                  </button>
+                </>
+              ) : null}
+
+              <div className="flex items-center gap-1 sm:gap-1.5 border-l border-[#1b261e] pl-2 sm:pl-3">
                 <button 
-                  onClick={handleManualRefresh}
-                  disabled={loading || isRefreshing}
-                  className="p-1.5 text-[#8c7e6c] hover:text-[#dfc9ab] hover:bg-[#1a1410] rounded transition-colors cursor-pointer disabled:opacity-40"
-                  title="Synchronize telemetry logs"
-                  id="stats-refresh-btn"
+                  onClick={toggleFullscreen}
+                  data-lock-control="true"
+                  className="p-1 sm:p-1.5 text-[#5e7564] hover:text-emerald-400 hover:bg-[#121914] rounded transition-colors cursor-pointer"
+                  title={isFullscreen ? "Restore compact size" : "Maximize / Fullscreen"}
+                  id="stats-fullscreen-btn"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isFullscreen ? (
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  )}
                 </button>
+                {isAuthorized && (
+                  <button 
+                    onClick={handleManualRefresh}
+                    disabled={loading || isRefreshing}
+                    className="p-1 sm:p-1.5 text-[#5e7564] hover:text-emerald-400 hover:bg-[#121914] rounded transition-colors cursor-pointer disabled:opacity-40"
+                    title="Synchronize telemetry logs"
+                    id="stats-refresh-btn"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  </button>
+                )}
                 <button 
                   onClick={onClose}
-                  className="p-1.5 text-[#8c7e6c] hover:text-red-400 hover:bg-red-950/30 rounded transition-colors cursor-pointer"
+                  data-lock-control="true"
+                  className="p-1 sm:p-1.5 text-[#5e7564] hover:text-red-400 hover:bg-red-950/30 rounded transition-colors cursor-pointer"
                   title="Close terminal (Esc)"
                   id="stats-close-btn"
                 >
@@ -772,178 +1295,391 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
           </div>
 
           {/* Body Content */}
-          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-            {loading && !stats ? (
-              <div className="flex flex-col items-center justify-center py-28 gap-3 text-center">
-                <Activity className="w-7 h-7 text-[#d4b28c] animate-pulse" />
-                <div className="text-[11px] text-[#8c7e6c] uppercase tracking-widest animate-pulse font-mono">
+          <div className="flex-1 p-2.5 sm:p-3.5 flex flex-col min-h-0 gap-2 sm:gap-2.5 overflow-hidden">
+            {authChecking ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-20 gap-3 text-center">
+                <Activity className="w-6 h-6 text-emerald-400 animate-pulse" />
+                <div className="text-[10px] text-[#5e7564] uppercase tracking-widest animate-pulse font-mono">
+                  VERIFYING SYSTEM PROTOCOL...
+                </div>
+              </div>
+            ) : !isAuthorized ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center select-none">
+                <div className="max-w-md w-full flex flex-col items-center gap-4">
+                  <div className="w-14 h-14 rounded-full border border-red-900/60 bg-red-950/20 flex items-center justify-center text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.15)]">
+                    <ShieldAlert className="w-7 h-7" />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <h2 className="text-xl sm:text-2xl font-bold tracking-widest text-red-400 font-mono uppercase">
+                      UNAUTHORIZED ACCESS
+                    </h2>
+                    <p className="text-[11px] text-[#5e7564] font-mono tracking-wider">
+                      Security clearance required to view telemetry node.
+                    </p>
+                  </div>
+
+                  {currentUser ? (
+                    <div className="w-full mt-2 p-3 rounded border border-red-900/50 bg-red-950/30 text-xs text-red-400/90 font-mono text-center flex flex-col items-center gap-2">
+                      <span>Connected as: <strong className="text-red-300">{currentUser.displayName || currentUser.email}</strong></span>
+                      <span className="text-[10px] text-red-400/70">Account is not on the admin whitelist.</span>
+                      <button
+                        onClick={handleSignOut}
+                        data-lock-control="true"
+                        className="mt-1 px-3 py-1 bg-red-900/40 hover:bg-red-900/70 border border-red-700 text-[10px] uppercase tracking-wider rounded transition-colors text-red-200 cursor-pointer"
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex flex-col items-center gap-3 w-full max-w-xs">
+                      {/* Master Passkey Entry: Works everywhere, mobile and desktop, zero OAuth headaches */}
+                      <form onSubmit={handleVerifyPasskey} className="w-full flex flex-col gap-2">
+                        <div className="relative">
+                          <input 
+                            type="password"
+                            value={passkeyInput}
+                            onChange={(e) => setPasskeyInput(e.target.value)}
+                            data-lock-control="true"
+                            placeholder="Enter clearance key..."
+                            className="w-full px-3 py-2 bg-[#090f0b] border border-[#233527] focus:border-emerald-500 rounded text-xs font-mono text-[#c8d4ca] placeholder-[#4f6454] outline-none text-center tracking-widest transition-colors"
+                          />
+                        </div>
+                        <button
+                          type="submit"
+                          data-lock-control="true"
+                          className="w-full py-2 bg-[#122317] hover:bg-[#1a3321] border border-[#2e5236] hover:border-emerald-500 rounded text-xs font-mono tracking-wider uppercase text-emerald-400 font-semibold transition-all cursor-pointer shadow-md"
+                        >
+                          Unlock Terminal
+                        </button>
+                      </form>
+                      
+                      {authError && (
+                        <div className="text-[10px] text-red-400 font-mono text-center mt-1">
+                          {authError}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="hidden" aria-hidden="true">
+                    <button
+                      type="button"
+                      id="radians-tab-trigger"
+                      data-honey-probe="hidden_radians_probe"
+                      data-tab="radians"
+                      tabIndex={-1}
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      02: LIVE RADIANS
+                    </button>
+                    <button
+                      type="button"
+                      id="admin-override-btn"
+                      data-honey-probe="nonexistent_admin_probe"
+                      data-admin-action="override"
+                      tabIndex={-1}
+                      onClick={(e) => e.preventDefault()}
+                    >
+                      ADMIN OVERRIDE
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : activeMainTab === 'radians' ? (
+              <React.Suspense fallback={
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                  <Activity className="w-6 h-6 text-emerald-400 animate-pulse" />
+                  <div className="text-[10px] text-[#5e7564] uppercase tracking-widest animate-pulse font-mono">
+                    LOADING RADIANS MODULE...
+                  </div>
+                </div>
+              }>
+                <LiveRadiansTab visitorId={currentVisitorIdShort} />
+              </React.Suspense>
+            ) : activeMainTab === 'cursors' ? (
+              <React.Suspense fallback={
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                  <Activity className="w-6 h-6 text-emerald-400 animate-pulse" />
+                  <div className="text-[10px] text-[#5e7564] uppercase tracking-widest animate-pulse font-mono">
+                    LOADING CURSORS MODULE...
+                  </div>
+                </div>
+              }>
+                <LiveCursorsTab
+                  visitorId={currentVisitorIdShort}
+                  activeSlug={activeSlug}
+                  onJumpToPeer={(targetSlug) => {
+                    onJumpToSlug?.(targetSlug);
+                    onClose();
+                  }}
+                />
+              </React.Suspense>
+            ) : loading && !stats ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+                <Activity className="w-6 h-6 text-emerald-400 animate-pulse" />
+                <div className="text-[10px] text-[#5e7564] uppercase tracking-widest animate-pulse font-mono">
                   INITIALIZING TELEMETRY UPLINK...
                 </div>
               </div>
             ) : error ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center text-red-400 border border-red-900/40 bg-red-950/15 rounded p-6">
-                <Database className="w-7 h-7 mb-2 text-red-500 animate-pulse" />
+              <div className="flex flex-col items-center justify-center py-12 text-center text-red-400 border border-red-900/40 bg-red-950/15 rounded p-5">
+                <Database className="w-6 h-6 mb-2 text-red-500 animate-pulse" />
                 <h4 className="text-xs font-bold uppercase tracking-wider mb-1 text-red-300">Access Protocol Fault</h4>
                 <p className="text-[11px] text-red-400/80 max-w-md leading-relaxed">{error}</p>
                 <button 
                   onClick={() => { setError(null); setRetryCount(prev => prev + 1); }}
-                  className="mt-3 px-3 py-1 bg-red-950/40 hover:bg-red-950/70 border border-red-800 text-[10px] uppercase tracking-wider rounded transition-colors text-red-300 font-semibold cursor-pointer"
+                  className="mt-3 px-3 py-1 bg-red-950/40 hover:bg-red-950/70 border border-red-800 text-[10px] uppercase tracking-wider rounded transition-colors text-red-300 font-semibold"
                 >
                   Retry Connection
                 </button>
               </div>
             ) : stats ? (
               <>
-                {/* 1. HUD Metrics Ribbon (3 Crisp Modular Cards) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Total Hits */}
-                  <div className="p-3.5 bg-[#14100c] border border-[#261e17] rounded hover:border-[#3d3024] transition-colors relative">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-semibold text-[#8c7e6c] uppercase tracking-wider flex items-center gap-1.5">
-                        <Eye className="w-3.5 h-3.5 text-[#d4b28c]" />
-                        Total Hits
-                      </span>
-                      <span className="text-[9px] text-[#b8a994] px-1.5 py-0.2 rounded border border-[#2b2118] bg-[#0d0b09]">
-                        IMPRESSIONS
-                      </span>
-                    </div>
-                    <div className="text-2xl sm:text-3xl font-bold text-[#fbf7f0] font-sans tracking-tight">
+                {/* Mobile HUD Tab Selector (< lg) */}
+                <div className="flex lg:hidden items-center bg-[#0d130f] p-1 rounded border border-[#1b261e] shrink-0 gap-1 select-none">
+                  <button
+                    type="button"
+                    onClick={() => setActiveMobileTab('overview')}
+                    className={`flex-1 py-1.5 px-2 rounded text-[10.5px] sm:text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                      activeMobileTab === 'overview'
+                        ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/80'
+                        : 'text-[#647c6a] hover:text-[#a4c9ad] border border-transparent'
+                    }`}
+                  >
+                    <BarChart3 className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Overview</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#080d0a] text-emerald-400 font-mono">
                       {stats.totalCount.toLocaleString()}
-                    </div>
-                    <div className="text-[9px] text-[#8c7e6c] mt-1 uppercase flex items-center gap-1 font-mono">
-                      <span>Global telemetry records</span>
-                    </div>
-                  </div>
-
-                  {/* Unique Survivors */}
-                  <div className="p-3.5 bg-[#14100c] border border-[#261e17] rounded hover:border-[#3d3024] transition-colors relative">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-semibold text-[#dfc9ab] uppercase tracking-wider flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-[#dfc9ab]" />
-                        Unique Visitors
-                      </span>
-                      <span className="text-[9px] text-[#dfc9ab] px-1.5 py-0.2 rounded border border-[#6b5842] bg-[#221c16]">
-                        DISTINCT
-                      </span>
-                    </div>
-                    <div className="text-2xl sm:text-3xl font-bold text-[#dfc9ab] font-sans tracking-tight">
-                      {stats.uniqueCount.toLocaleString()}
-                    </div>
-                    <div className="text-[9px] text-[#8c7e6c] mt-1 uppercase font-mono">
-                      Unique terminal hardware nodes
-                    </div>
-                  </div>
-
-                  {/* Returning Operatives */}
-                  <div className="p-3.5 bg-[#14100c] border border-[#261e17] rounded hover:border-[#3d3024] transition-colors relative">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[10px] font-semibold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Activity className="w-3.5 h-3.5 text-amber-400" />
-                        Returning Visitors
-                      </span>
-                      <span className="text-[9px] text-amber-300 px-1.5 py-0.2 rounded border border-amber-900/40 bg-amber-950/30 font-mono">
-                        {retentionRate}% RETENTION
-                      </span>
-                    </div>
-                    <div className="text-2xl sm:text-3xl font-bold text-amber-300 font-sans tracking-tight">
-                      {stats.repeatCount.toLocaleString()}
-                    </div>
-                    <div className="text-[9px] text-[#8c7e6c] mt-1 uppercase font-mono">
-                      Repeated sessions logged
-                    </div>
-                  </div>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveMobileTab('stream')}
+                    className={`flex-1 py-1.5 px-2 rounded text-[10.5px] sm:text-xs font-semibold uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${
+                      activeMobileTab === 'stream'
+                        ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/80'
+                        : 'text-[#647c6a] hover:text-[#a4c9ad] border border-transparent'
+                    }`}
+                  >
+                    <Radio className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Trace Stream</span>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#080d0a] text-emerald-400 font-mono">
+                      {filteredLogs.length}
+                    </span>
+                  </button>
                 </div>
 
-                {/* 2. Split Analytical Panels: Top Destinations & Trace Stream */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
-                  
-                  {/* Left Column: Top Page Views / Destinations */}
-                  <div className="lg:col-span-5 bg-[#14100c] border border-[#261e17] rounded p-3.5 flex flex-col h-[460px]">
-                    <div className="flex items-center justify-between pb-2.5 border-b border-[#261e17] mb-2 select-none">
-                      <span className="text-[11px] font-semibold text-[#dfc9ab] uppercase tracking-wider flex items-center gap-1.5">
-                        <Layers className="w-3.5 h-3.5 text-[#d4b28c]" />
-                        Top Destinations ({totalTargetsCount})
-                      </span>
-                      {totalTargetsCount > 6 && (
-                        <button
-                          type="button"
-                          onClick={() => setShowAllTargets(prev => !prev)}
-                          className="text-[9px] text-[#8c7e6c] hover:text-[#dfc9ab] font-mono uppercase transition-colors cursor-pointer"
-                        >
-                          {showAllTargets ? 'Show Top 6' : `View All (${totalTargetsCount})`}
-                        </button>
-                      )}
+                {/* Unified Master 2-Column Command Cockpit (Side-by-Side on Desktop, Tabbed on Mobile) */}
+                <div className="flex-1 min-h-0 flex flex-col lg:grid lg:grid-cols-12 gap-2.5 sm:gap-3 overflow-hidden">
+                  {/* Left Analytical Sidebar: 3 Metric Cards + Telemetry Targets */}
+                  <div className={`${activeMobileTab === 'overview' ? 'flex' : 'hidden'} lg:flex lg:col-span-4 flex-col gap-2 sm:gap-2.5 h-full min-h-0 overflow-hidden`}>
+                    {/* 3 Compressed Metric Cards Stack */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-1 gap-1.5 sm:gap-2 shrink-0">
+                      {/* Total Hits */}
+                      <div className="px-2.5 py-1.5 sm:py-2 bg-[#0d120f] border border-[#1b261e] rounded hover:border-[#27382c] transition-colors relative overflow-hidden">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[10.5px] sm:text-[11.5px] font-semibold text-[#738f7a] uppercase tracking-wider flex items-center gap-1.5 truncate">
+                            <Eye className="w-3.5 h-3.5 text-emerald-500/80 shrink-0" />
+                            <span className="hidden sm:inline">Total Hits</span>
+                            <span className="sm:hidden">Hits</span>
+                          </span>
+                          <span className="text-[8.5px] sm:text-[9px] text-[#5e7564] px-1.5 py-0.2 rounded border border-[#1b261e] bg-[#090d0a] font-mono shrink-0">
+                            ALL
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-1">
+                          <div className="text-lg sm:text-2xl font-bold text-[#e1eae2] font-sans tracking-tight">
+                            {stats.totalCount.toLocaleString()}
+                          </div>
+                          <div className="text-[8.5px] sm:text-[9.5px] text-[#5e7564] uppercase font-mono truncate hidden sm:block">
+                            Global records
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Unique Survivors */}
+                      <div className="px-2.5 py-1.5 sm:py-2 bg-[#0d120f] border border-[#1b261e] rounded hover:border-[#27382c] transition-colors relative overflow-hidden">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[10.5px] sm:text-[11.5px] font-semibold text-emerald-400/90 uppercase tracking-wider flex items-center gap-1.5 truncate">
+                            <Users className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            <span className="hidden sm:inline">Survivors</span>
+                            <span className="sm:hidden">Unique</span>
+                          </span>
+                          <span className="text-[8.5px] sm:text-[9px] text-emerald-400/90 px-1.5 py-0.2 rounded border border-emerald-900/40 bg-emerald-950/30 font-mono shrink-0">
+                            DISTINCT
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-1">
+                          <div className="text-lg sm:text-2xl font-bold text-emerald-400 font-sans tracking-tight">
+                            {stats.uniqueCount.toLocaleString()}
+                          </div>
+                          <div className="text-[8.5px] sm:text-[9.5px] text-emerald-500/70 uppercase font-mono truncate hidden sm:block">
+                            Hardware nodes
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Returning Operatives */}
+                      <div className="px-2.5 py-1.5 sm:py-2 bg-[#0d120f] border border-[#1b261e] rounded hover:border-[#27382c] transition-colors relative overflow-hidden">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-[10.5px] sm:text-[11.5px] font-semibold text-amber-400/90 uppercase tracking-wider flex items-center gap-1.5 truncate">
+                            <Activity className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="hidden sm:inline">Returning</span>
+                            <span className="sm:hidden">Return</span>
+                          </span>
+                          <span className="text-[8.5px] sm:text-[9px] text-amber-400/90 px-1.5 py-0.2 rounded border border-amber-900/40 bg-amber-950/30 font-mono shrink-0">
+                            {retentionRate}%
+                          </span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-1">
+                          <div className="text-lg sm:text-2xl font-bold text-amber-400 font-sans tracking-tight">
+                            {stats.repeatCount.toLocaleString()}
+                          </div>
+                          <div className="text-[8.5px] sm:text-[9.5px] text-amber-500/70 uppercase font-mono truncate hidden sm:block">
+                            Re-entries
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
-                    {topPages.length === 0 ? (
-                      <div className="text-center py-8 text-[11px] text-[#8c7e6c] italic">
-                        No page view distribution recorded.
+                    {/* Telemetry Targets: Responsive Height */}
+                    <div className="bg-[#0c110e] border border-[#1b261e] rounded p-2.5 sm:p-3 flex flex-col flex-1 min-h-0 overflow-hidden">
+                      <div className="flex items-center justify-between pb-2 border-b border-[#1b261e] mb-2 select-none shrink-0 gap-2">
+                        <div className="flex items-center gap-1.5 sm:gap-2">
+                          <BarChart3 className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span className="text-xs sm:text-sm font-semibold text-[#a4c9ad] uppercase tracking-wider">
+                            Telemetry Targets
+                          </span>
+                          {totalTargetsCount > 0 && (
+                            <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded bg-[#111713] border border-[#1e2a20] text-emerald-400 font-mono">
+                              {totalTargetsCount}
+                            </span>
+                          )}
+                        </div>
+                        {totalTargetsCount > 6 ? (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllTargets(prev => !prev)}
+                            className="text-[9px] sm:text-[10px] font-mono px-2 py-0.5 rounded border border-[#213025] hover:border-emerald-600/60 bg-[#101712] hover:bg-[#152018] text-[#86a58e] hover:text-emerald-300 transition-colors uppercase tracking-wider cursor-pointer shrink-0"
+                          >
+                            {showAllTargets ? 'Top 6' : `All (${totalTargetsCount})`}
+                          </button>
+                        ) : (
+                          <span className="text-[9px] sm:text-[10px] text-[#4f6454] uppercase tracking-wider shrink-0">
+                            Ranked
+                          </span>
+                        )}
                       </div>
-                    ) : (
-                      <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
-                        {topPages.map((page) => (
-                          <div key={page.slug} className="group">
-                            <div className="flex items-center justify-between text-[11px] mb-1">
-                              <div className="flex items-center gap-2 min-w-0 pr-2">
-                                <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
-                                  page.rank === 1 
-                                    ? 'bg-[#2a2118] border-[#8c7355] text-[#fbf7f0]' 
-                                    : 'bg-[#18130f] border-[#2c2219] text-[#8c7e6c]'
-                                }`}>
-                                  #{String(page.rank).padStart(2, '0')}
-                                </span>
-                                <span className="truncate text-[#ede4d4] group-hover:text-[#dfc9ab] transition-colors" title={page.title}>
-                                  {page.title}
+
+                      {/* Fast Page Search & Filter Input */}
+                      <div className="relative mb-2 shrink-0">
+                        <Search className="w-3.5 h-3.5 text-[#5e7564] absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={pageSearchQuery}
+                          onChange={(e) => setPageSearchQuery(e.target.value)}
+                          placeholder="Filter targets (e.g. Dimensions, Home)..."
+                          className="w-full bg-[#080d0a] border border-[#1b261e] focus:border-emerald-600/70 focus:outline-none text-[10px] sm:text-[11px] font-mono text-[#d6ded7] placeholder-[#4f6454] pl-7 pr-7 py-1 rounded transition-all"
+                        />
+                        {pageSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setPageSearchQuery('')}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#5e7564] hover:text-[#d6ded7] transition-colors p-0.5 cursor-pointer"
+                            title="Clear filter"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {topPages.length === 0 ? (
+                        <div className="text-center py-8 text-xs text-[#4f6454] italic">
+                          {pageSearchQuery ? `No telemetry target matching "${pageSearchQuery}"` : 'No page view distribution recorded.'}
+                        </div>
+                      ) : (
+                        <div className="flex-1 overflow-y-auto space-y-1.5 sm:space-y-2 pr-1 scrollbar-thin">
+                          {topPages.map((page) => (
+                            <div key={page.slug} className="group">
+                              <div 
+                                onClick={() => {
+                                  // Click page target to instantly filter the entire history trace stream for this page
+                                  setSearchUserId(page.slug);
+                                }}
+                                className="flex items-center justify-between text-[10px] sm:text-[11px] mb-1 cursor-pointer select-none"
+                                title={`Click to filter all historical trace logs for "${page.title}"`}
+                              >
+                                <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                                  <span className={`text-[8.5px] sm:text-[9.5px] font-bold px-1.5 py-0.5 rounded border ${
+                                    page.rank === 1 
+                                      ? 'bg-emerald-950/60 border-emerald-800 text-emerald-300' 
+                                      : 'bg-[#111713] border-[#1f2c22] text-[#5e7564]'
+                                  }`}>
+                                    #{String(page.rank).padStart(2, '0')}
+                                  </span>
+                                  <span className="truncate text-xs sm:text-[13px] text-[#cad6cc] group-hover:text-emerald-300 transition-colors" title={page.title}>
+                                    {page.title}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] sm:text-[11px] text-emerald-400 font-mono font-bold shrink-0">
+                                  {page.count.toLocaleString()} <span className="text-[8px] sm:text-[8.5px] font-normal text-[#4f6454]">HITS</span>
                                 </span>
                               </div>
-                              <span className="text-[10px] text-[#dfc9ab] font-mono font-bold shrink-0">
-                                {page.count.toLocaleString()} <span className="text-[8px] font-normal text-[#8c7e6c]">HITS</span>
-                              </span>
+                              {/* Sleek Minimalist Progress Bar */}
+                              <div className="w-full h-1.5 bg-[#121914] rounded-full overflow-hidden border border-[#1a251d]/50">
+                                <div 
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    page.rank === 1 ? 'bg-emerald-400' : 'bg-emerald-600/70'
+                                  }`}
+                                  style={{ width: `${page.percentage}%` }}
+                                />
+                              </div>
                             </div>
-
-                            {/* Sleek Minimalist Progress Bar */}
-                            <div className="w-full h-1 bg-[#1a1410] rounded-full overflow-hidden border border-[#2b2118]/40">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  page.rank === 1 ? 'bg-[#dfc9ab]' : 'bg-[#8c7355]'
-                                }`}
-                                style={{ width: `${page.percentage}%` }}
-                              />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Right Column: Realtime Telemetry Stream with Integrated User ID Search Engine */}
-                  <div className="lg:col-span-7 bg-[#14100c] border border-[#261e17] rounded p-3.5 flex flex-col h-[460px]">
+                  <div className={`${activeMobileTab === 'stream' ? 'flex' : 'hidden'} lg:flex lg:col-span-8 bg-[#0c110e] border border-[#1b261e] rounded p-2.5 sm:p-3 flex-col h-full min-h-0 overflow-hidden`}>
                     {/* Stream Header & Filters */}
-                    <div className="flex items-center justify-between pb-2.5 border-b border-[#261e17] mb-2 select-none">
-                      <div className="flex items-center gap-2">
-                        <span className="relative flex h-2 w-2">
-                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${searchResults !== null ? 'bg-amber-400' : 'bg-[#dfc9ab]'} opacity-60`}></span>
-                          <span className={`relative inline-flex rounded-full h-2 w-2 ${searchResults !== null ? 'bg-amber-500' : 'bg-[#dfc9ab]'}`}></span>
+                    <div className="flex flex-wrap sm:flex-row items-start sm:items-center justify-between pb-2 border-b border-[#1b261e] mb-2 select-none gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+                        <span className="relative flex h-2.5 w-2.5 shrink-0">
+                          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${searchResults !== null ? 'bg-cyan-400' : 'bg-emerald-400'} opacity-60`}></span>
+                          <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${searchResults !== null ? 'bg-cyan-500' : 'bg-emerald-500'}`}></span>
                         </span>
-                        <span className="text-[11px] font-semibold text-[#dfc9ab] uppercase tracking-wider">
-                          {searchResults !== null ? 'Database History Audit' : 'Telemetry Trace Stream'}
+                        <span className="text-xs sm:text-sm font-semibold text-[#a4c9ad] uppercase tracking-wider truncate">
+                          {searchResults !== null ? (
+                            <>
+                              <span className="hidden sm:inline">Database History Audit</span>
+                              <span className="sm:hidden">History Audit</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="hidden sm:inline">Telemetry Trace Stream</span>
+                              <span className="sm:hidden">Trace Stream</span>
+                            </>
+                          )}
                         </span>
                         {searchResults !== null && (
-                          <span className="text-[8px] px-1.5 py-0.2 rounded bg-amber-950/70 border border-amber-800 text-amber-300 font-mono uppercase font-bold">
+                          <span className="text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded bg-cyan-950/70 border border-cyan-800 text-cyan-300 font-mono uppercase font-bold shrink-0">
                             HISTORICAL
                           </span>
                         )}
                       </div>
 
                       {/* Filter Pills */}
-                      <div className="flex items-center gap-1 bg-[#0d0b09] p-0.5 rounded border border-[#261e17]">
+                      <div className="flex items-center gap-1 bg-[#090d0a] p-0.5 rounded border border-[#1b261e] shrink-0 self-start sm:self-auto">
                         <button
                           type="button"
                           onClick={() => setLogFilter('all')}
-                          className={`px-2 py-0.5 text-[9px] uppercase font-semibold rounded transition-colors cursor-pointer ${
+                          className={`px-2 py-0.5 text-[9px] sm:text-[10px] uppercase font-semibold rounded transition-colors cursor-pointer ${
                             logFilter === 'all'
-                              ? 'bg-[#271f16] text-[#fbf7f0] border border-[#524131]'
-                              : 'text-[#8c7e6c] hover:text-[#dfc9ab]'
+                              ? 'bg-[#1b261e] text-[#d6ded7] border border-[#2b3c30]'
+                              : 'text-[#4f6454] hover:text-[#a4c9ad]'
                           }`}
                         >
                           All ({activeLogsPool.length})
@@ -951,43 +1687,54 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
                         <button
                           type="button"
                           onClick={() => setLogFilter('unique')}
-                          className={`px-2 py-0.5 text-[9px] uppercase font-semibold rounded transition-colors cursor-pointer ${
+                          className={`px-2 py-0.5 text-[9px] sm:text-[10px] uppercase font-semibold rounded transition-colors cursor-pointer ${
                             logFilter === 'unique'
-                              ? 'bg-[#2a2118] text-[#dfc9ab] border border-[#8c7355]'
-                              : 'text-[#8c7e6c] hover:text-[#dfc9ab]'
+                              ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800'
+                              : 'text-[#4f6454] hover:text-emerald-400'
                           }`}
                         >
-                          Unique ({activeLogsPool.filter(l => l.type === 'unique').length})
+                          Unique ({logCounts.unique})
                         </button>
                         <button
                           type="button"
                           onClick={() => setLogFilter('repeat')}
-                          className={`px-2 py-0.5 text-[9px] uppercase font-semibold rounded transition-colors cursor-pointer ${
+                          className={`px-2 py-0.5 text-[9px] sm:text-[10px] uppercase font-semibold rounded transition-colors cursor-pointer ${
                             logFilter === 'repeat'
                               ? 'bg-amber-950/70 text-amber-300 border border-amber-800'
-                              : 'text-[#8c7e6c] hover:text-amber-400'
+                              : 'text-[#4f6454] hover:text-amber-400'
                           }`}
                         >
-                          Return ({activeLogsPool.filter(l => l.type === 'repeat').length})
+                          Return ({logCounts.repeat})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setLogFilter('click')}
+                          className={`px-2 py-0.5 text-[9px] sm:text-[10px] uppercase font-semibold rounded transition-colors cursor-pointer ${
+                            logFilter === 'click'
+                              ? 'bg-purple-950/70 text-purple-300 border border-purple-800'
+                              : 'text-[#4f6454] hover:text-purple-400'
+                          }`}
+                        >
+                          Clicks ({logCounts.click})
                         </button>
                       </div>
                     </div>
 
                     {/* Optimized User ID Search Engine */}
-                    <div className="relative mb-2">
+                    <div className="relative mb-2 shrink-0">
                       <div className="relative flex items-center">
-                        <Search className="w-3.5 h-3.5 text-[#8c7e6c] absolute left-2.5 pointer-events-none" />
+                        <Search className="w-4 h-4 text-[#5e7564] absolute left-2.5 pointer-events-none" />
                         <input
                           type="text"
                           value={searchUserId}
                           onChange={(e) => setSearchUserId(e.target.value)}
-                          placeholder="Search User ID across database history (e.g. surv_q8c, alvt29s)..."
-                          className="w-full bg-[#0d0b09] border border-[#261e17] focus:border-[#c5a880] focus:outline-none text-[11px] font-mono text-[#ede4d4] placeholder-[#8c7e6c] pl-8 pr-16 py-1.5 rounded transition-all"
+                          placeholder="Search User ID, device/OS (e.g. Linux, Windows), or node..."
+                          className="w-full bg-[#080d0a] border border-[#1b261e] focus:border-emerald-600/70 focus:outline-none text-[11px] sm:text-xs font-mono text-[#d6ded7] placeholder-[#4f6454] pl-8.5 pr-20 py-1.5 rounded transition-all"
                         />
                         {searchUserId ? (
                           <div className="absolute right-2 flex items-center gap-1.5">
                             {isSearching && (
-                              <span className="w-2.5 h-2.5 rounded-full border border-[#dfc9ab] border-t-transparent animate-spin" />
+                              <span className="w-2.5 h-2.5 rounded-full border border-emerald-400 border-t-transparent animate-spin" />
                             )}
                             <button
                               type="button"
@@ -996,17 +1743,17 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
                                 setSearchResults(null);
                                 setSearchSummary(null);
                               }}
-                              className="text-[#8c7e6c] hover:text-[#ede4d4] transition-colors p-0.5 cursor-pointer"
+                              className="text-[#5e7564] hover:text-[#d6ded7] transition-colors p-0.5 cursor-pointer"
                               title="Clear search"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ) : (
                           <button
                             type="button"
                             onClick={() => setSearchUserId(currentVisitorIdShort)}
-                            className="absolute right-2 text-[9px] text-[#8c7e6c] hover:text-[#dfc9ab] transition-colors uppercase font-mono px-1.5 py-0.5 bg-[#17120e] rounded border border-[#2b2118] cursor-pointer"
+                            className="absolute right-1.5 text-[8.5px] sm:text-[9.5px] text-[#5e7564] hover:text-emerald-400 transition-colors uppercase font-mono px-2 py-0.5 bg-[#0e1611] rounded border border-[#1c271f] cursor-pointer"
                             title="Audit history for your current browser node"
                           >
                             My Node
@@ -1017,149 +1764,239 @@ export default function StatsModal({ isOpen, onClose, articles }: StatsModalProp
 
                     {/* Search Result Intelligence Card */}
                     {searchUserId.trim() && (
-                      <div className="mb-2 bg-[#0d0b09] border border-[#261e17] rounded p-2 text-[10px] font-mono select-none">
-                        {isSearching ? (
-                          <div className="flex items-center gap-2 text-[#dfc9ab] py-0.5">
-                            <span className="w-2.5 h-2.5 rounded-full border border-[#dfc9ab] border-t-transparent animate-spin" />
-                            <span>Querying full database history for node "{searchUserId}"...</span>
+                      <div className="mb-2 bg-[#080d0a] border border-[#1b261e] rounded p-2 text-[9.5px] sm:text-[10px] font-mono select-none shrink-0">
+                        {(isSearching || archiveStatus.isSyncing) && (!searchResults || searchResults.length === 0) ? (
+                          <div className="flex items-center justify-between gap-2 text-emerald-400 py-0.5">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full border border-emerald-400 border-t-transparent animate-spin" />
+                              <span>
+                                Scanning full database for "{searchUserId}" ({archiveStatus.totalIndexed.toLocaleString()} indexed)...
+                              </span>
+                            </div>
                           </div>
                         ) : searchResults && searchResults.length > 0 ? (
                           <div className="space-y-1">
-                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1f1812] pb-1">
-                              <div className="flex items-center gap-1.5 text-[#dfc9ab] font-semibold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-[#dfc9ab]" />
-                                <span>DATABASE AUDIT: {searchResults.length} RECORDS FOUND</span>
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#141d16] pb-1">
+                              <div className="flex items-center gap-1.5 text-emerald-300 font-semibold">
+                                <span className={`w-1.5 h-1.5 rounded-full ${archiveStatus.isSyncing ? 'bg-cyan-400 animate-pulse' : 'bg-emerald-400'}`} />
+                                <span>AUDIT: {searchResults.length.toLocaleString()} RECORDS FOUND</span>
+                                {archiveStatus.isSyncing && (
+                                  <span className="text-[8px] text-cyan-300 font-normal">
+                                    (INDEXING {archiveStatus.totalIndexed.toLocaleString()}...)
+                                  </span>
+                                )}
                               </div>
-                              <div className="text-[9px] text-[#8c7e6c]">
-                                {searchSummary?.matchedNodes.length} NODE(S) MATCHED
+                              <div className="text-[8px] sm:text-[8.5px] text-[#55695a] flex items-center gap-2">
+                                <span>{searchSummary?.matchedNodes.length} NODE(S) MATCHED</span>
+                                <span className={archiveStatus.isComplete ? 'text-emerald-500/80' : 'text-cyan-400/80'}>
+                                  · {archiveStatus.isComplete ? `FULL ARCHIVE (${archiveStatus.totalIndexed.toLocaleString()})` : `${archiveStatus.totalIndexed.toLocaleString()} INDEXED`}
+                                </span>
                               </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[9px] text-[#b8a994]">
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[8px] sm:text-[8.5px] text-[#7a9480]">
                               {searchSummary?.oldestDate && (
                                 <span>
-                                  FIRST RECORDED: <strong className="text-[#fbf7f0]">{new Date(searchSummary.oldestDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
+                                  FIRST: <strong className="text-[#a4c9ad]">{new Date(searchSummary.oldestDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
                                 </span>
                               )}
                               {searchSummary?.newestDate && (
                                 <span>
-                                  LATEST ACTIVITY: <strong className="text-[#fbf7f0]">{new Date(searchSummary.newestDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
+                                  LATEST: <strong className="text-[#a4c9ad]">{new Date(searchSummary.newestDate).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
                                 </span>
                               )}
                               {searchSummary?.topTarget && (
                                 <span>
-                                  TOP TARGET: <strong className="text-[#dfc9ab]">{searchSummary.topTarget.title} ({searchSummary.topTarget.count}x)</strong>
+                                  TOP: <strong className="text-emerald-400">{searchSummary.topTarget.title} ({searchSummary.topTarget.count}x)</strong>
+                                </span>
+                              )}
+                              {searchSummary?.device && (
+                                <span>
+                                  PLATFORM: <strong className="text-emerald-300 font-semibold">{searchSummary.device}</strong>
                                 </span>
                               )}
                             </div>
+                            {archiveStatus.error && (
+                              <div className="text-[8px] text-amber-400/90 pt-0.5">
+                                {archiveStatus.error}
+                              </div>
+                            )}
                           </div>
                         ) : (
-                          <div className="text-[#8c7e6c] italic py-0.5">
-                            No records found in database history matching node ID "{searchUserId}".
+                          <div className="flex items-center justify-between gap-2 text-[#687f6e] italic py-0.5">
+                            <span>No records found in database history matching "{searchUserId}".</span>
+                            <span className="not-italic text-[8px] text-[#55695a]">
+                              {archiveStatus.isComplete ? `${archiveStatus.totalIndexed.toLocaleString()} LOGS SCANNED` : `${archiveStatus.totalIndexed.toLocaleString()} INDEXED`}
+                            </span>
                           </div>
                         )}
                       </div>
                     )}
 
                     {/* Scrollable Log Stream */}
-                    <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 text-[11px] font-mono scrollbar-thin">
+                    <div className="flex-1 overflow-y-auto space-y-1.5 sm:space-y-2 pr-1 pb-2 font-mono scrollbar-thin">
                       {filteredLogs.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-center py-12 text-[#8c7e6c] italic">
-                          <Radio className="w-5 h-5 mb-1.5 text-[#423425]" />
-                          <span>No telemetry trace events match the active criteria.</span>
+                        <div className="flex flex-col items-center justify-center h-full text-center py-10 text-[#4f6454] italic">
+                          <Radio className="w-4 h-4 mb-1 text-[#303f34]" />
+                          <span className="text-xs">No telemetry trace events match the active criteria.</span>
                         </div>
                       ) : (
-                        filteredLogs.map((log, index) => {
+                        <>
+                        {filteredLogs.slice(0, displayLimit).map((log, index) => {
                           const date = new Date(log.timestamp);
-                          const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-                          const timeStr = `${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })} · ${dateStr}`;
+                          const timeOnly = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                           const isNew = log.type === 'unique';
                           const relativeTime = formatRelativeTime(log.timestamp);
+                          const isCurrentVisitor = log.visitorId === currentVisitorIdShort;
+                          const displayBrowser = log.browser || (isCurrentVisitor ? clientEnv.browser : null);
+                          const displayOs = log.os || (isCurrentVisitor ? clientEnv.os : null);
+                          const display = formatLogDisplay(log);
 
                           return (
                             <div 
                               key={`${log.timestamp}-${index}`} 
-                              className="px-2.5 py-1.5 bg-[#0d0b09] hover:bg-[#1a1410] border border-[#221a13] rounded transition-colors flex items-center justify-between gap-2"
+                              className="px-2.5 py-1.5 bg-[#080c09] hover:bg-[#101712] border border-[#162018] rounded transition-colors flex items-center justify-between gap-2 min-h-[32px] text-[10px] sm:text-[11px]"
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                {/* Timestamp */}
-                                <span className="text-[#8c7e6c] text-[10px] font-semibold shrink-0" title={date.toLocaleString()}>
-                                  [{timeStr}]
+                              {/* Left: Timestamp, Type Badge, Target Action */}
+                              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 truncate">
+                                {/* Monospace Timestamp */}
+                                <span className="text-[#4e6453] text-[9px] sm:text-[10px] font-semibold shrink-0" title={date.toLocaleString()}>
+                                  [{timeOnly}]
                                 </span>
 
-                                {/* Categorized Status Pill */}
-                                {log.slug === 'telemetry-terminal' ? (
-                                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] uppercase font-bold tracking-wider bg-[#2a2118] text-[#dfc9ab] border border-[#8c7355]">
-                                    TERMINAL
+                                {/* Categorized Badge */}
+                                {log.type === 'click' ? (
+                                  <span className="shrink-0 px-1.5 py-0.2 rounded text-[7.5px] sm:text-[8px] uppercase font-bold tracking-wider bg-purple-950/80 text-purple-300 border border-purple-700/80">
+                                    CLK
+                                  </span>
+                                ) : log.slug === 'telemetry-terminal' ? (
+                                  <span className="shrink-0 px-1.5 py-0.2 rounded text-[7.5px] sm:text-[8px] uppercase font-bold tracking-wider bg-cyan-950/80 text-cyan-300 border border-cyan-800/80">
+                                    TERM
                                   </span>
                                 ) : isNew ? (
-                                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] uppercase font-bold tracking-wider bg-[#261e16] text-[#dfc9ab] border border-[#6b5842]">
-                                    NEW NODE
+                                  <span className="shrink-0 px-1.5 py-0.2 rounded text-[7.5px] sm:text-[8px] uppercase font-bold tracking-wider bg-emerald-950/80 text-emerald-300 border border-emerald-700/80">
+                                    NEW
                                   </span>
                                 ) : (
-                                  <span className="shrink-0 px-1.5 py-0.5 rounded text-[8px] uppercase font-bold tracking-wider bg-[#221c16] text-amber-300 border border-amber-800/80">
-                                    RETURN
+                                  <span className="shrink-0 px-1.5 py-0.2 rounded text-[7.5px] sm:text-[8px] uppercase font-bold tracking-wider bg-[#1c180a] text-amber-300 border border-amber-800/80">
+                                    RET
                                   </span>
                                 )}
 
                                 {/* Destination Title */}
-                                <span className="text-[#ede4d4] hover:text-[#dfc9ab] transition-colors truncate flex items-center gap-1.5">
-                                  {log.slug === 'telemetry-terminal' && (
-                                    <Terminal className="w-3 h-3 text-[#d4b28c] shrink-0 inline" />
+                                <span className="text-[#c8d8cb] hover:text-emerald-300 transition-colors truncate font-medium flex items-center gap-1">
+                                  {log.type === 'click' ? (
+                                    <MousePointerClick className="w-3 h-3 text-purple-400 shrink-0 inline" />
+                                  ) : log.slug === 'telemetry-terminal' ? (
+                                    <Terminal className="w-3 h-3 text-cyan-400 shrink-0 inline" />
+                                  ) : null}
+                                  <span className="truncate">{display.main}</span>
+                                  {display.sub && (
+                                    <span className="text-[#556e5d] text-[9px] shrink-0 font-normal">
+                                      · {display.sub}
+                                    </span>
                                   )}
-                                  {getArticleTitle(log.slug)}
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-2 shrink-0">
-                                {/* Clickable Visitor ID Chip */}
-                                {log.visitorId === currentVisitorIdShort ? (
+                              {/* Right: Device Pill, Visitor Node Chip, Relative Time */}
+                              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                                {/* Inline Device Pill (Clickable Filter) */}
+                                {(displayBrowser || displayOs) && (
+                                  <div 
+                                    onClick={() => setSearchUserId(displayOs || displayBrowser || 'Linux')}
+                                    title={`Click to filter complete database history for ${displayOs || displayBrowser}`}
+                                    className="flex items-center gap-1 text-[8px] sm:text-[8.5px] text-[#5e7765] hover:text-emerald-300 bg-[#0c120e] hover:bg-[#121c15] px-1.5 py-0.5 rounded border border-[#162017] hover:border-emerald-700/60 transition-colors cursor-pointer select-none group"
+                                  >
+                                    <Monitor className="w-2.5 h-2.5 text-emerald-500/70 group-hover:text-emerald-400 shrink-0" />
+                                    <div className="flex items-center gap-1 truncate max-w-[130px]">
+                                      {displayBrowser && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSearchUserId(displayBrowser);
+                                          }}
+                                          title={`Filter complete history for browser: ${displayBrowser}`}
+                                          className="hover:text-emerald-300 hover:underline cursor-pointer transition-colors"
+                                        >
+                                          {displayBrowser}
+                                        </button>
+                                      )}
+                                      {displayBrowser && displayOs && (
+                                        <span className="text-[#324536] text-[7.5px]">·</span>
+                                      )}
+                                      {displayOs && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSearchUserId(displayOs);
+                                          }}
+                                          title={`Filter complete history for OS: ${displayOs}`}
+                                          className="font-medium text-[#7a9d82] hover:text-emerald-300 hover:underline cursor-pointer transition-colors"
+                                        >
+                                          {displayOs}
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Visitor Node Chip */}
+                                {isCurrentVisitor ? (
                                   <button
                                     type="button"
                                     onClick={() => setSearchUserId(log.visitorId)}
                                     title="Click to search full database history for your node"
-                                    className="text-[9px] text-[#fbf7f0] bg-[#2a2118] px-1.5 py-0.2 rounded border border-[#8c7355] font-mono font-semibold hover:bg-[#3d3023] hover:border-[#c5a880] transition-colors cursor-pointer"
+                                    className="text-[8.5px] sm:text-[9px] text-emerald-300 bg-emerald-950/60 px-1.5 sm:px-2 py-0.5 rounded border border-emerald-700/60 font-mono font-semibold hover:bg-emerald-900/80 hover:border-emerald-500 transition-colors cursor-pointer"
                                   >
-                                    {log.visitorId} (YOU)
+                                    {log.visitorId} <span className="hidden sm:inline">(YOU)</span>
                                   </button>
                                 ) : (
                                   <button
                                     type="button"
                                     onClick={() => setSearchUserId(log.visitorId)}
                                     title={`Click to search complete database history for node ${log.visitorId}`}
-                                    className="text-[9px] text-[#8c7e6c] bg-[#14100c] px-1.5 py-0.2 rounded border border-[#261e17] font-mono hover:text-[#dfc9ab] hover:border-[#423325] transition-colors cursor-pointer"
+                                    className="text-[8.5px] sm:text-[9px] text-[#637d68] bg-[#0d140f] px-1.5 sm:px-2 py-0.5 rounded border border-[#1c271f] font-mono hover:text-emerald-400 hover:border-[#2f3f33] transition-colors cursor-pointer"
                                   >
                                     {log.visitorId}
                                   </button>
                                 )}
 
-                                {/* Elapsed */}
-                                <span className="text-[9px] text-[#8c7e6c] w-12 text-right hidden sm:inline">
+                                {/* Elapsed Time */}
+                                <span className="text-[#415546] shrink-0 text-[8px] sm:text-[8.5px] font-mono min-w-[34px] text-right">
                                   {relativeTime}
                                 </span>
                               </div>
                             </div>
                           );
-                        })
+                        })}
+                        {filteredLogs.length > displayLimit && (
+                          <div className="flex items-center justify-center gap-2 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => setDisplayLimit(prev => prev + 250)}
+                              className="px-3 py-1.5 bg-[#0e1611] hover:bg-[#15221a] border border-[#1f2e23] hover:border-emerald-700/60 text-[10px] font-mono text-emerald-300 rounded transition-colors cursor-pointer"
+                            >
+                              Load +250 ({(filteredLogs.length - displayLimit).toLocaleString()} remaining)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDisplayLimit(filteredLogs.length)}
+                              className="px-3 py-1.5 bg-[#0a100c] hover:bg-[#131d17] border border-[#1b261e] text-[10px] font-mono text-[#7a9480] hover:text-emerald-300 rounded transition-colors cursor-pointer"
+                            >
+                              Show All ({filteredLogs.length.toLocaleString()})
+                            </button>
+                          </div>
+                        )}
+                        </>
                       )}
                     </div>
                   </div>
                 </div>
-
-                {/* 3. Footer Protocol Banner */}
-                <div className="p-3 bg-[#14100c] border border-[#261e17] rounded text-[10px] text-[#8c7e6c] leading-relaxed select-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                  <div>
-                    <span className="text-[#dfc9ab] font-bold mr-1">PROTOCOL SUMMARY:</span>
-                    {isSandbox 
-                      ? "Sandbox mode engaged. Analytics persist safely in browser sandbox storage."
-                      : "Telemetry uplink synchronized with central database cluster. Visitor sessions strictly anonymized."}
-                  </div>
-                  <div className="text-[9px] text-[#8c7e6c] shrink-0 font-mono">
-                    PRESS <kbd className="px-1 py-0.2 bg-[#1b1511] border border-[#2e2319] text-[#b8a994] rounded text-[8px]">ESC</kbd> TO EXIT TERMINAL
-                  </div>
-                </div>
               </>
             ) : (
-              <div className="text-center py-12 text-[#8c7e6c] italic">
+              <div className="text-center py-12 text-[#4f6454] italic">
                 System awaiting first scan.
               </div>
             )}

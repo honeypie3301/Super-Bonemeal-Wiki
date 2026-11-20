@@ -15,7 +15,7 @@ export const WIKI_OPTIONS: WikiOption[] = [
   {
     id: 'backwoods',
     title: 'BACKWOODS',
-    url: 'https://honeypie3301.github.io/Backwoods-Wiki/'
+    url: 'https://honeypie3301.github.io/Backwoods-Wiki/#/wiki/home'
   },
   {
     id: 'darwinism',
@@ -33,27 +33,57 @@ export default function TitleDialPicker() {
   const dragStartY = useRef<number>(0);
   const dragStartPos = useRef<number>(0);
   const animFrameId = useRef<number | null>(null);
+  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSettling = useRef<boolean>(false);
   const isAutoResetting = useRef<boolean>(false);
 
   const itemHeight = 52;
   const viewportHeight = 56;
 
-  // Reset to Backwoods (0) on mount, focus, or pageshow (such as when user presses Back button)
+  // Reset to Backwoods (0) on mount, focus, pageshow, popstate, or visibilitychange
   useEffect(() => {
-    setPosition(0);
-    setSelectedIndex(0);
-
     const handleReset = () => {
+      if (animFrameId.current) {
+        cancelAnimationFrame(animFrameId.current);
+        animFrameId.current = null;
+      }
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+        resetTimeoutRef.current = null;
+      }
+      isSettling.current = false;
+      isAutoResetting.current = false;
+      setIsDragging(false);
       setPosition(0);
       setSelectedIndex(0);
     };
 
+    handleReset();
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        handleReset();
+      }
+    };
+
     window.addEventListener('pageshow', handleReset);
     window.addEventListener('focus', handleReset);
+    window.addEventListener('popstate', handleReset);
+    window.addEventListener('hashchange', handleReset);
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       window.removeEventListener('pageshow', handleReset);
       window.removeEventListener('focus', handleReset);
+      window.removeEventListener('popstate', handleReset);
+      window.removeEventListener('hashchange', handleReset);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (animFrameId.current) {
+        cancelAnimationFrame(animFrameId.current);
+      }
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -102,7 +132,10 @@ export default function TitleDialPicker() {
       }
 
       // 2. Animate dial back to BACKWOODS (0) smoothly
-      setTimeout(() => {
+      if (resetTimeoutRef.current) {
+        clearTimeout(resetTimeoutRef.current);
+      }
+      resetTimeoutRef.current = setTimeout(() => {
         isAutoResetting.current = true;
         animateToTarget(0, false);
       }, 350);
@@ -254,9 +287,9 @@ export default function TitleDialPicker() {
                 zIndex: Math.round(10 - absOffset * 2)
               }}
               className={`
-                absolute left-0 right-0 flex items-center justify-center px-2 text-center
-                font-serif text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-wide sm:tracking-widest uppercase transition-all duration-75 max-w-full truncate
-                ${isCenter ? 'text-[#fbf7f0]' : 'text-[#c5a880]/70'}
+                absolute left-0 right-0 flex items-center justify-center px-1 text-center
+                font-display text-[clamp(1.5rem,5.5vw,3rem)] font-bold tracking-[clamp(0.04em,1vw,0.18em)] uppercase transition-all duration-75 whitespace-nowrap select-none
+                ${isCenter ? 'text-ink' : 'text-accent-text'}
               `}
             >
               {opt.title}

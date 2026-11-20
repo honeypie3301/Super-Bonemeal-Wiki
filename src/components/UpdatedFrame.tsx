@@ -4,9 +4,9 @@
  * DON'T FORGET: Whenever you update wiki content, you MUST also update the "Wiki Maintenance & Version Update Note"
  * in `HomeView.tsx` with the latest feature/commit highlights.
  * Rule: Only underline "The wiki is always updated before a new version releases."
- * NEVER DELETE `.github/workflows/deploy.yml` (used for automated GitHub Pages static deployment).
  */
 import React, { useEffect, useRef, useState } from 'react';
+import { useTheme } from '../context/ThemeContext';
 
 interface UpdatedFrameProps {
   id: string; // Unique identifier for localStorage tracking
@@ -24,13 +24,15 @@ export default function UpdatedFrame({
   className = '',
   badgeLabel = 'UPDATED'
 }: UpdatedFrameProps) {
+  const { theme } = useTheme();
+
   const [active, setActive] = useState<boolean>(() => {
     if (!isUpdated) return false;
     try {
-      const seen = localStorage.getItem(`bonemeal_updated_seen_${id}`);
+      const seen = localStorage.getItem(`backwoods_updated_seen_${id}`);
       return seen !== 'true';
     } catch (e) {
-      return true;
+      return false;
     }
   });
 
@@ -57,34 +59,53 @@ export default function UpdatedFrame({
     return () => observer.disconnect();
   }, [active]);
 
-  // Start 7-second countdown once displayed on user screen
+  // Permanently mark as seen IMMEDIATELY when shown on user screen
   useEffect(() => {
     if (active && isVisible) {
+      // Instantly mark as seen in localStorage so it is NEVER shown on subsequent sessions/views
+      try {
+        localStorage.setItem(`backwoods_updated_seen_${id}`, 'true');
+      } catch (e) {
+        // Ignore sandbox restriction errors
+      }
+
+      // Hide badge/border after 7-second grace period for current view
       const timer = setTimeout(() => {
         setActive(false);
-        try {
-          localStorage.setItem(`bonemeal_updated_seen_${id}`, 'true');
-        } catch (e) {
-          // Ignore quota / security error in restricted sandboxes
-        }
       }, 7000);
 
       return () => clearTimeout(timer);
     }
   }, [active, isVisible, id]);
 
+  const isStarlight = theme === 'starlight';
+
   return (
     <div
       ref={containerRef}
       className={`relative transition-all duration-700 ${
-        active
-          ? 'z-20 border border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.25)] rounded-xl'
-          : ''
+        isStarlight
+          ? active
+            ? 'z-20 border border-zinc-400/70 shadow-[0_0_8px_rgba(228,228,231,0.25)] rounded-xl animate-pulse'
+            : ''
+          : active
+            ? 'z-20 border border-accent-border shadow-md rounded-xl'
+            : ''
       } ${className}`}
     >
       {active && (
-        <div className="absolute top-2.5 right-2.5 z-30 bg-amber-500/90 text-[#0f110d] font-mono text-[9px] font-bold px-2 py-0.5 rounded-full border border-amber-300/40 shadow-sm uppercase tracking-wider flex items-center gap-1 pointer-events-none select-none">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-200" />
+        <div
+          className={`absolute top-2.5 right-2.5 z-30 font-mono text-[9px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5 pointer-events-none select-none ${
+            isStarlight
+              ? 'bg-zinc-800 text-zinc-200 border border-zinc-600 shadow-[0_0_6px_rgba(228,228,231,0.25)]'
+              : 'bg-accent text-accent-ink border border-accent-border'
+          }`}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              isStarlight ? 'bg-zinc-950 animate-ping' : 'bg-accent-ink/80'
+            }`}
+          />
           <span>{badgeLabel}</span>
           <span className="text-[8px] opacity-75 font-normal">(7s)</span>
         </div>
@@ -93,3 +114,4 @@ export default function UpdatedFrame({
     </div>
   );
 }
+

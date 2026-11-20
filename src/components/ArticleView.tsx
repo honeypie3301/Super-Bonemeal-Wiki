@@ -1,22 +1,26 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo, Suspense, lazy } from 'react';
 import { 
   ChevronLeft, 
   ChevronRight, 
   ArrowUp, 
   FileText, 
   ExternalLink,
-  MessageSquareWarning
+  MessageSquareWarning,
+  Loader2
 } from 'lucide-react';
 import { WikiArticle } from '../types';
 import { parseWikiSyntax, slugify } from '../utils/parser';
 
-import VersionsView from './special/VersionsView';
-import ItemsView from './special/ItemsView';
 import HomeView from './special/HomeView';
+const MechanicsView = lazy(() => import('./special/MechanicsView'));
+const VersionsView = lazy(() => import('./special/VersionsView'));
+const ItemsView = lazy(() => import('./special/ItemsView'));
+const AcquisitionView = lazy(() => import('./special/AcquisitionView'));
+const TechnicalView = lazy(() => import('./special/TechnicalView'));
 
 interface ArticleViewProps {
   article: WikiArticle;
-  rawContent: string;
+  rawContent?: string;
   articles: WikiArticle[];
   searchQuery: string;
 }
@@ -29,41 +33,34 @@ interface HeadingItem {
 
 export default function ArticleView({
   article,
-  rawContent,
+  rawContent = '',
   articles,
   searchQuery
 }: ArticleViewProps) {
-  const [htmlContent, setHtmlContent] = useState('');
-  const [headings, setHeadings] = useState<HeadingItem[]>([]);
   const [activeHeadingId, setActiveHeadingId] = useState('');
-  const [readingProgress, setReadingProgress] = useState(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+  const showScrollTopRef = useRef(false);
 
-  const isSpecialPage = ['home', 'items', 'versions'].includes(article.slug);
+  const isSpecialPage = ['home', 'mechanics', 'versions', 'items', 'acquisition', 'technical'].includes(article.slug);
 
-  // Parse headers and content
-  useEffect(() => {
-    if (!rawContent) return;
+  // Synchronously memoize headers and parsed HTML to avoid double-render passes
+  const { htmlContent, headings } = useMemo(() => {
+    if (!rawContent) {
+      return { htmlContent: '', headings: [] as HeadingItem[] };
+    }
 
-    // Check if interactive page or home/versions page - if so, hide "On This Page" entirely to maximize view width
-    if (isSpecialPage) {
-      setHeadings([]);
-    } else {
-      // Extract headings for TOC (only on standard document pages)
-      const foundHeadings: HeadingItem[] = [];
+    const foundHeadings: HeadingItem[] = [];
+    if (!isSpecialPage) {
       const lines = rawContent.split('\n');
       lines.forEach(line => {
         const trimmed = line.trim();
-        
-        // Skip comment lines entirely to prevent capturing comments as headings
         if (trimmed.startsWith('<!--') || trimmed.endsWith('-->')) {
           return;
         }
 
-        // 1. MediaWiki Headings
-        // ==== h4 ====
         const h4WikiMatch = trimmed.match(/^====\s*([^=]*?)\s*====\s*$/);
         if (h4WikiMatch) {
           foundHeadings.push({
@@ -74,7 +71,6 @@ export default function ArticleView({
           return;
         }
 
-        // === h3 ===
         const h3WikiMatch = trimmed.match(/^===\s*([^=]*?)\s*===\s*$/);
         if (h3WikiMatch) {
           foundHeadings.push({
@@ -85,7 +81,6 @@ export default function ArticleView({
           return;
         }
 
-        // == h2 ==
         const h2WikiMatch = trimmed.match(/^==\s*([^=]*?)\s*==\s*$/);
         if (h2WikiMatch) {
           foundHeadings.push({
@@ -96,7 +91,6 @@ export default function ArticleView({
           return;
         }
 
-        // 2. HTML Headings, e.g. <h2 style="...">Heading Text</h2>
         const htmlMatch = trimmed.match(/<(h2|h3|h4)(?:\s+[^>]*?)?>(.*?)<\/\1>/i);
         if (htmlMatch) {
           const tag = htmlMatch[1].toLowerCase();
@@ -110,28 +104,25 @@ export default function ArticleView({
           });
         }
       });
-      setHeadings(foundHeadings);
     }
 
-    // Parse the wiki syntax to HTML
     let parsed = parseWikiSyntax(rawContent);
 
-    // If there's a search query, highlight it inside text (outside of html tags)
     if (searchQuery && searchQuery.trim().length > 1) {
       const escapedQuery = searchQuery.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
       try {
         const queryRegex = new RegExp(`(?<!<[^>]*)\\b(${escapedQuery})\\b`, 'gi');
-        parsed = parsed.replace(queryRegex, match => `<mark class="bg-[#2a2118] text-[#fbf7f0] px-0.5 rounded border border-[#8c7355]/60">${match}</mark>`);
-      } catch (e) {
+        parsed = parsed.replace(queryRegex, match => `<mark class="bg-accent-soft text-accent-text px-0.5 rounded border border-accent-border">${match}</mark>`);
+      } catch {
         // Fallback if lookbehind is not supported or regex fails
       }
     }
 
-    setHtmlContent(parsed);
+    return { htmlContent: parsed, headings: foundHeadings };
   }, [rawContent, searchQuery, isSpecialPage]);
 
   // Find next and previous articles in sorted manifest
-  const { prevArticle, nextArticle } = React.useMemo(() => {
+  const { prevArticle, nextArticle } = useMemo(() => {
     const currentIndex = articles.findIndex(a => a.slug === article.slug);
     return {
       prevArticle: currentIndex > 0 ? articles[currentIndex - 1] : null,
@@ -139,50 +130,69 @@ export default function ArticleView({
     };
   }, [article, articles]);
 
-  // Track scroll for active heading, reading progress, and scroll-to-top button
+  // Track scroll with GPU transform scaleX and edge-triggered scroll-top state
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      // 1. Scroll-to-top button visibility
-      if (window.scrollY > 400) {
-        setShowScrollTop(true);
-      } else {
-        setShowScrollTop(false);
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const scrollY = window.scrollY;
+          const nextShowTop = scrollY > 400;
+          if (nextShowTop !== showScrollTopRef.current) {
+            showScrollTopRef.current = nextShowTop;
+            setShowScrollTop(nextShowTop);
+          }
+
+          if (progressBarRef.current) {
+            const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const ratio = totalHeight > 0 ? Math.min(1, Math.max(0, scrollY / totalHeight)) : 0;
+            progressBarRef.current.style.transform = `scaleX(${ratio})`;
+          }
+
+          ticking = false;
+        });
+        ticking = true;
       }
-
-      // 2. Reading progress calculation
-      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (totalHeight > 0) {
-        const progress = (window.scrollY / totalHeight) * 100;
-        setReadingProgress(Math.min(100, Math.max(0, progress)));
-      }
-
-      // 3. Highlight current heading in TOC
-      if (headings.length === 0) return;
-
-      const headingElements = headings.map(h => document.getElementById(h.id)).filter(Boolean) as HTMLElement[];
-      
-      let currentActiveId = '';
-      const scrollPosition = window.scrollY + 120; // offset
-
-      for (let i = headingElements.length - 1; i >= 0; i--) {
-        if (headingElements[i].offsetTop <= scrollPosition) {
-          currentActiveId = headingElements[i].id;
-          break;
-        }
-      }
-
-      if (!currentActiveId && headingElements.length > 0) {
-        currentActiveId = headingElements[0].id;
-      }
-      
-      setActiveHeadingId(currentActiveId);
     };
 
-    window.addEventListener('scroll', handleScroll);
-    // Trigger once on mount/load
+    window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
 
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // IntersectionObserver for Table of Contents heading tracking (avoids getBoundingClientRect layout thrashing)
+  useEffect(() => {
+    if (headings.length === 0) return;
+
+    const headingElements = headings
+      .map(h => document.getElementById(h.id))
+      .filter((el): el is HTMLElement => el !== null);
+
+    if (headingElements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Find visible headings
+        const visibleEntries = entries.filter(entry => entry.isIntersecting);
+        if (visibleEntries.length > 0) {
+          // Sort by their vertical position in document
+          const topEntry = visibleEntries.reduce((prev, curr) => 
+            curr.boundingClientRect.top < prev.boundingClientRect.top ? curr : prev
+          );
+          setActiveHeadingId(topEntry.target.id);
+        }
+      },
+      {
+        rootMargin: '-80px 0px -60% 0px',
+        threshold: [0, 1.0]
+      }
+    );
+
+    headingElements.forEach(el => observer.observe(el));
+
+    return () => observer.disconnect();
   }, [headings]);
 
   const handleScrollToHeading = (id: string) => {
@@ -190,7 +200,7 @@ export default function ArticleView({
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
-    // Dispatch custom event for special views to sync selection
+    // Dispatch custom event for special views (Entities, Dimensions, Blocks) to sync selection
     window.dispatchEvent(new CustomEvent('wiki-scroll-to-heading', { detail: { id } }));
   };
 
@@ -199,31 +209,32 @@ export default function ArticleView({
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col lg:flex-row gap-8 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-8">
-      
+    <div className="relative min-h-screen flex flex-col lg:flex-row gap-8 max-w-[1440px] w-full mx-auto px-4 sm:px-8 py-8">
+
       {/* Reading Progress Bar (top of the page) */}
-      <div className="fixed top-0 left-0 right-0 h-[3px] bg-[#2a2118]/40 z-50 pointer-events-none">
-        <div 
-          className="h-full bg-gradient-to-r from-[#8c7355] to-[#dfc9ab] transition-all duration-75"
-          style={{ width: `${readingProgress}%` }}
+      <div className="fixed top-0 left-0 right-0 h-[3px] bg-line-soft z-50 pointer-events-none">
+        <div
+          ref={progressBarRef}
+          className="h-full w-full origin-left will-change-transform bg-accent transition-transform duration-75"
+          style={{ transform: 'scaleX(0)' }}
         />
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 min-w-0">
-        
+
         {/* Navigation Breadcrumb */}
-        <div className="flex items-center gap-2 text-[11px] font-mono text-[#8c7e6c] uppercase tracking-wider mb-6 select-none">
-          <a href="#/wiki/home" className="hover:text-[#dfc9ab] transition-colors">WIKI</a>
-          <span>/</span>
-          <span className="text-[#b8a994]">{article.category}</span>
-          <span>/</span>
-          <span className="text-[#d4b28c]">{article.title}</span>
+        <div className="flex items-center gap-2 text-xs font-mono text-ink-subtle mb-5 select-none">
+          <a href="#/wiki/home" className="hover:text-accent-text hover:underline underline-offset-4 transition-colors">Wiki</a>
+          <span aria-hidden="true">/</span>
+          <span className="text-ink-muted">{article.category}</span>
+          <span aria-hidden="true">/</span>
+          <span className="text-accent-text font-medium truncate">{article.title}</span>
         </div>
 
         {/* Title Block */}
-        <div className="border-b border-[#2b2219] pb-6 mb-8">
-          <h1 className="font-serif text-4xl sm:text-5xl font-extrabold text-[#fbf7f0] tracking-tight leading-tight">
+        <div className="border-b border-line pb-5 mb-8">
+          <h1 className="font-display text-3xl sm:text-5xl font-bold text-ink tracking-tight leading-tight [text-wrap:balance]">
             {article.title}
           </h1>
         </div>
@@ -231,34 +242,46 @@ export default function ArticleView({
         {/* Article Body */}
         <article className="min-h-[400px]">
           {isSpecialPage ? (
-            article.slug === 'home' ? (
-              <HomeView />
-            ) : article.slug === 'versions' ? (
-              <VersionsView />
-            ) : article.slug === 'items' ? (
-              <ItemsView />
-            ) : null
+            <Suspense fallback={
+              <div className="flex flex-col items-center justify-center p-16 space-y-3 font-mono text-xs text-accent-text">
+                <Loader2 className="w-6 h-6 animate-spin text-accent-text" />
+                <span className="tracking-wider uppercase">Loading Archive Module...</span>
+              </div>
+            }>
+              {article.slug === 'home' ? (
+                <HomeView />
+              ) : article.slug === 'mechanics' ? (
+                <MechanicsView />
+              ) : article.slug === 'versions' ? (
+                <VersionsView />
+              ) : article.slug === 'items' ? (
+                <ItemsView />
+              ) : article.slug === 'acquisition' ? (
+                <AcquisitionView />
+              ) : article.slug === 'technical' ? (
+                <TechnicalView />
+              ) : null}
+            </Suspense>
           ) : (
-            /* HTML Rendered view */
-            <div 
+            <div
               ref={containerRef}
-              className="wiki-html-content text-sm sm:text-base leading-relaxed text-[#ede4d4] space-y-6 select-text"
+              className="wiki-html-content text-sm sm:text-base leading-relaxed text-ink-muted space-y-6 select-text"
               dangerouslySetInnerHTML={{ __html: htmlContent }}
             />
           )}
         </article>
 
         {/* Next/Previous Article Controls */}
-        <div className="mt-12 pt-6 border-t border-[#2b2219] flex flex-col sm:flex-row gap-4 justify-between items-stretch select-none">
+        <div className="mt-12 pt-6 border-t border-line flex flex-col sm:flex-row gap-4 justify-between items-stretch select-none">
           {prevArticle ? (
-            <a 
+            <a
               href={`#/wiki/${prevArticle.slug}`}
-              className="flex-1 flex items-center gap-3 p-4 bg-[#14110d] hover:bg-[#1d1712] border border-[#2b2219] hover:border-[#453728] rounded-lg group transition-all"
+              className="flex-1 flex items-center gap-3 p-4 bg-surface hover:bg-surface-alt border border-line hover:border-accent/50 rounded-xl group transition-colors"
             >
-              <ChevronLeft className="w-5 h-5 text-[#8c7e6c] group-hover:text-[#dfc9ab] transition-colors" />
-              <div className="text-left">
-                <div className="text-[10px] font-mono text-[#8c7e6c] uppercase tracking-wider">Previous Page</div>
-                <div className="text-xs font-serif text-[#fbf7f0] font-semibold group-hover:text-[#dfc9ab] transition-colors mt-0.5">{prevArticle.title}</div>
+              <ChevronLeft className="w-5 h-5 text-ink-subtle group-hover:text-accent-text transition-colors shrink-0" />
+              <div className="text-left min-w-0">
+                <div className="text-[11px] font-mono text-ink-subtle">Previous Page</div>
+                <div className="text-sm font-display text-ink font-semibold group-hover:text-accent-text transition-colors mt-0.5 truncate">{prevArticle.title}</div>
               </div>
             </a>
           ) : (
@@ -266,15 +289,15 @@ export default function ArticleView({
           )}
 
           {nextArticle ? (
-            <a 
+            <a
               href={`#/wiki/${nextArticle.slug}`}
-              className="flex-1 flex items-center justify-between p-4 bg-[#14110d] hover:bg-[#1d1712] border border-[#2b2219] hover:border-[#453728] rounded-lg group transition-all"
+              className="flex-1 flex items-center justify-between gap-3 p-4 bg-surface hover:bg-surface-alt border border-line hover:border-accent/50 rounded-xl group transition-colors"
             >
-              <div className="text-left">
-                <div className="text-[10px] font-mono text-[#8c7e6c] uppercase tracking-wider text-right sm:text-left">Next Page</div>
-                <div className="text-xs font-serif text-[#fbf7f0] font-semibold group-hover:text-[#dfc9ab] transition-colors mt-0.5">{nextArticle.title}</div>
+              <div className="text-left min-w-0">
+                <div className="text-[11px] font-mono text-ink-subtle">Next Page</div>
+                <div className="text-sm font-display text-ink font-semibold group-hover:text-accent-text transition-colors mt-0.5 truncate">{nextArticle.title}</div>
               </div>
-              <ChevronRight className="w-5 h-5 text-[#8c7e6c] group-hover:text-[#dfc9ab] transition-colors" />
+              <ChevronRight className="w-5 h-5 text-ink-subtle group-hover:text-accent-text transition-colors shrink-0" />
             </a>
           ) : (
             <div className="flex-1 opacity-0 pointer-events-none hidden sm:block" />
@@ -285,30 +308,30 @@ export default function ArticleView({
       {/* Right Column: Table of Contents (Desktop sticky) */}
       {headings.length > 0 && (
         <aside className="hidden lg:block w-[240px] shrink-0 select-none">
-          <div className="sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto pl-4 border-l border-[#2b2219]/60 space-y-4">
-            <h3 className="font-mono text-[10px] font-bold text-[#8c7e6c] uppercase tracking-widest flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-[#5a4634]" />
+          <div className="sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto pl-4 border-l border-line-soft space-y-3">
+            <h3 className="font-mono text-[11px] font-semibold text-ink-subtle uppercase tracking-wider flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-ink-subtle" />
               On This Page
             </h3>
-            
-            <ul className="space-y-2 text-xs">
+
+            <ul className="space-y-1.5 text-xs">
               {headings.map((h, hIdx) => {
                 const isActive = activeHeadingId === h.id;
                 return (
-                  <li 
+                  <li
                     key={`${h.id}-${hIdx}`}
                     className={`
-                      leading-normal transition-all duration-150
+                      leading-normal transition-colors duration-150
                       ${h.level === 3 ? 'pl-3' : 'pl-0'}
                     `}
                   >
                     <button
                       onClick={() => handleScrollToHeading(h.id)}
                       className={`
-                        text-left hover:text-[#fbf7f0] block w-full truncate cursor-pointer
-                        ${isActive 
-                          ? 'text-[#dfc9ab] font-medium border-l border-[#d4b28c] -ml-[17px] pl-[16px]' 
-                          : 'text-[#8c7e6c]'
+                        text-left hover:text-ink block w-full truncate cursor-pointer py-0.5
+                        ${isActive
+                          ? 'text-accent-text font-semibold'
+                          : 'text-ink-subtle'
                         }
                       `}
                     >
@@ -326,8 +349,9 @@ export default function ArticleView({
       {showScrollTop && (
         <button
           onClick={handleScrollTop}
-          className="fixed bottom-6 right-6 p-2.5 bg-[#241c14] hover:bg-[#33271c] border border-[#4d3e2c] hover:border-[#6e5539] text-[#dfc9ab] rounded-full shadow-lg z-50 cursor-pointer transition-all hover:scale-105 duration-200"
+          className="fixed bottom-6 right-6 p-2.5 bg-surface hover:bg-surface-alt border border-line hover:border-accent/60 text-accent-text rounded-full shadow-lg z-50 cursor-pointer transition-all hover:scale-105 duration-200"
           title="Scroll to Top"
+          aria-label="Scroll to top of document"
         >
           <ArrowUp className="w-4 h-4" />
         </button>
