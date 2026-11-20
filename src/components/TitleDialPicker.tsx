@@ -4,6 +4,7 @@ export interface WikiOption {
   id: string;
   title: string;
   url?: string;
+  fallbackUrls?: string[];
 }
 
 export const WIKI_OPTIONS: WikiOption[] = [
@@ -15,19 +16,88 @@ export const WIKI_OPTIONS: WikiOption[] = [
   {
     id: 'backwoods',
     title: 'BACKWOODS',
-    url: 'https://honeypie3301.github.io/Backwoods-Wiki/#/wiki/home'
+    url: 'https://honeypie3301.github.io/Backwoods-Wiki/#/wiki/home',
+    fallbackUrls: ['https://backwoods-wiki.vercel.app/']
   },
   {
     id: 'darwinism',
     title: 'DARWINISM',
-    url: 'https://honeypie3301.github.io/Darwinism-Wiki/#/wiki/home'
+    url: 'https://honeypie3301.github.io/Darwinism-Wiki/#/wiki/home',
+    fallbackUrls: []
   }
 ];
+
+const PROBE_TIMEOUT_MS = 2500;
+
+async function isUrlReachable(candidateUrl: string): Promise<boolean> {
+  const probeUrl = candidateUrl.split('#')[0];
+  let hostname = '';
+  try {
+    hostname = new URL(probeUrl).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(probeUrl, {
+      method: 'HEAD',
+      mode: 'cors',
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return false;
+    }
+    if (hostname.endsWith('.github.io')) {
+      return false;
+    }
+    const fallbackController = new AbortController();
+    const fallbackTimeout = setTimeout(() => fallbackController.abort(), PROBE_TIMEOUT_MS);
+    try {
+      await fetch(probeUrl, {
+        method: 'HEAD',
+        mode: 'no-cors',
+        cache: 'no-store',
+        signal: fallbackController.signal,
+      });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(fallbackTimeout);
+    }
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function resolveWikiDestination(option: WikiOption): Promise<string | undefined> {
+  const candidates = [
+    ...(option.url ? [option.url] : []),
+    ...(option.fallbackUrls ?? []),
+  ];
+  if (candidates.length === 0) return undefined;
+  if (candidates.length === 1) return candidates[0];
+
+  for (const candidate of candidates) {
+    if (await isUrlReachable(candidate)) {
+      return candidate;
+    }
+  }
+
+  return option.fallbackUrls?.[0] ?? option.url;
+}
 
 export default function TitleDialPicker() {
   const [position, setPosition] = useState<number>(0);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef<number>(0);
@@ -36,11 +106,59 @@ export default function TitleDialPicker() {
   const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSettling = useRef<boolean>(false);
   const isAutoResetting = useRef<boolean>(false);
+  const navRequestIdRef = useRef<number>(0);
 
-  const itemHeight = 52;
-  const viewportHeight = 56;
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-  // Reset to Backwoods (0) on mount, focus, pageshow, popstate, or visibilitychange
+    const updateWidth = () => {
+      setContainerWidth(el.clientWidth);
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const observer = new ResizeObserver(() => {
+        updateWidth();
+      });
+      observer.observe(el);
+      return () => observer.disconnect();
+    }
+
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+
+  const isCompact = containerWidth > 0 && containerWidth < 340;
+  const itemHeight = isCompact ? 64 : 52;
+  const viewportHeight = isCompact ? 70 : 56;
+
+  const titleTypographyStyle: React.CSSProperties | undefined = (() => {
+    if (containerWidth <= 0) return undefined;
+
+    if (isCompact) {
+      const compactSize = Math.max(18, Math.min(26, containerWidth * 0.082));
+      return {
+        fontSize: `${compactSize}px`,
+        letterSpacing: '0.06em',
+        lineHeight: 1.08,
+      };
+    }
+
+    const ratio = Math.max(0, Math.min(1, (containerWidth - 340) / 440));
+    const trackingEm = 0.04 + ratio * 0.14;
+    const divisor = 12.6 + trackingEm * 10;
+    const computedFontSize = Math.max(20, Math.min(48, (containerWidth - 16) / divisor));
+
+    return {
+      fontSize: `${computedFontSize}px`,
+      letterSpacing: `${trackingEm.toFixed(3)}em`,
+      lineHeight: 1.1,
+    };
+  })();
+
+  // Reset to Super Bonemeal (0) on mount, focus, pageshow, popstate, or visibilitychange
   useEffect(() => {
     const handleReset = () => {
       if (animFrameId.current) {
@@ -53,6 +171,7 @@ export default function TitleDialPicker() {
       }
       isSettling.current = false;
       isAutoResetting.current = false;
+      navRequestIdRef.current += 1;
       setIsDragging(false);
       setPosition(0);
       setSelectedIndex(0);
@@ -126,12 +245,15 @@ export default function TitleDialPicker() {
     if (!targetOption) return;
 
     if (index !== 0) {
-      // 1. If option has a URL (e.g. Super Bonemeal), redirect to it
-      if (targetOption.url) {
-        window.location.href = targetOption.url;
-      }
+      const requestId = ++navRequestIdRef.current;
 
-      // 2. Animate dial back to BACKWOODS (0) smoothly
+      void (async () => {
+        const destination = await resolveWikiDestination(targetOption);
+        if (destination && requestId === navRequestIdRef.current) {
+          window.location.href = destination;
+        }
+      })();
+
       if (resetTimeoutRef.current) {
         clearTimeout(resetTimeoutRef.current);
       }
@@ -140,6 +262,7 @@ export default function TitleDialPicker() {
         animateToTarget(0, false);
       }, 350);
     } else {
+      navRequestIdRef.current += 1;
       if (window.location.hash !== '#/wiki/home' && window.location.hash !== '') {
         window.location.hash = '#/wiki/home';
       }
@@ -162,6 +285,7 @@ export default function TitleDialPicker() {
       cancelAnimationFrame(animFrameId.current);
     }
     isAutoResetting.current = false;
+    navRequestIdRef.current += 1;
 
     setIsDragging(true);
     dragStartY.current = clientY;
@@ -254,7 +378,7 @@ export default function TitleDialPicker() {
       onTouchEnd={onTouchEnd}
       onWheel={handleWheel}
       style={{ height: `${viewportHeight}px` }}
-      className="relative overflow-hidden cursor-grab active:cursor-grabbing select-none touch-none flex items-center justify-center w-full"
+      className="@container relative overflow-hidden cursor-grab active:cursor-grabbing select-none touch-none flex items-center justify-center w-full"
     >
       <div
         className="relative w-full h-full flex items-center justify-center"
@@ -284,11 +408,13 @@ export default function TitleDialPicker() {
                 height: `${itemHeight}px`,
                 transform: `translateY(${translateY}px) rotateX(${rotateX}deg) scale(${scale})`,
                 opacity: opacity,
-                zIndex: Math.round(10 - absOffset * 2)
+                zIndex: Math.round(10 - absOffset * 2),
+                ...titleTypographyStyle,
               }}
               className={`
                 absolute left-0 right-0 flex items-center justify-center px-1 text-center
-                font-display text-[clamp(1.5rem,5.5vw,3rem)] font-bold tracking-[clamp(0.04em,1vw,0.18em)] uppercase transition-all duration-75 whitespace-nowrap select-none
+                font-display text-[clamp(1.25rem,6cqi,3rem)] font-bold tracking-[clamp(0.04em,0.8cqi,0.18em)] uppercase transition-all duration-75 select-none
+                ${isCompact ? 'whitespace-normal text-balance' : 'whitespace-nowrap'}
                 ${isCenter ? 'text-ink' : 'text-accent-text'}
               `}
             >

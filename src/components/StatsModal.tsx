@@ -1187,7 +1187,7 @@ export default function StatsModal({
               <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <Terminal className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span className="text-xs sm:text-sm font-semibold tracking-wider text-[#a4c9ad] uppercase truncate">
-                  <span className="hidden sm:inline">BACKWOODS TELEMETRY TERMINAL</span>
+                  <span className="hidden sm:inline">SUPER BONEMEAL TELEMETRY TERMINAL</span>
                   <span className="sm:hidden">TELEMETRY</span>
                 </span>
 

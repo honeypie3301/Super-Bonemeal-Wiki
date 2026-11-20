@@ -23,9 +23,9 @@ export default function HomeView() {
 
       {/* 1. LOGO HERO BANNER WITH INTERACTIVE DIAL PICKER */}
       <UpdatedFrame id="sb_home_hero_dial_picker" isUpdated={true}>
-        <div className="relative overflow-hidden rounded-xl bg-surface border border-line p-8 text-center shadow-xs space-y-2 transition-colors">
+        <div className="relative overflow-hidden rounded-xl bg-surface border border-line px-4 py-6 sm:p-8 text-center shadow-xs space-y-2 transition-colors">
           <TitleDialPicker />
-          <p className="text-xs sm:text-sm font-mono tracking-[0.2em] text-accent-text uppercase">
+          <p className="text-[11px] sm:text-sm font-mono tracking-[0.12em] sm:tracking-[0.2em] text-accent-text uppercase text-balance">
             Official Landscape &amp; Crop Expansion Guide
           </p>
         </div>
