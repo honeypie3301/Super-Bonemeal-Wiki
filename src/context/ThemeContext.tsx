@@ -63,8 +63,8 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  theme: 'emerald',
-  baseTheme: 'emerald',
+  theme: 'archival-dusk',
+  baseTheme: 'archival-dusk',
   toggleTheme: () => {},
   cycleTheme: () => {},
   toggleArchivalTheme: () => {},
@@ -161,7 +161,7 @@ function readPersistedTheme(): WikiTheme {
   } catch {
     // Fallback below
   }
-  return 'emerald';
+  return 'archival-dusk';
 }
 
 function readPersistedBaseTheme(): BaseWikiTheme {
@@ -181,7 +181,7 @@ function readPersistedBaseTheme(): BaseWikiTheme {
     // Ignore
   }
   const active = readPersistedTheme();
-  return isBaseTheme(active) ? active : 'emerald';
+  return isBaseTheme(active) ? active : 'archival-dusk';
 }
 
 function persistThemeChoice(newTheme: WikiTheme, newBaseTheme?: BaseWikiTheme) {

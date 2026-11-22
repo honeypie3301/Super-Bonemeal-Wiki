@@ -1,4 +1,5 @@
 import express from "express";
+import compression from "compression";
 import http from "http";
 import path from "path";
 import fs from "fs";
@@ -201,6 +202,7 @@ async function startServer() {
   const httpServer = http.createServer(app);
   const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
 
+  app.use(compression());
   app.use(express.json());
 
   // Probe endpoint so static hosts (Vercel / Cloudflare Pages) never trigger WebSocket errors
@@ -327,6 +329,7 @@ async function startServer() {
   } else {
     const cwdDist = path.join(process.cwd(), 'dist');
     const distPath = fs.existsSync(path.join(cwdDist, 'index.html')) ? cwdDist : __dirname;
+    app.use('/assets', express.static(path.join(distPath, 'assets'), { maxAge: '1y', immutable: true }));
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

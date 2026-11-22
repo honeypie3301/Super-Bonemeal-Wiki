@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { initRadiansSync } from '../../utils/radiansSync';
+import { CELESTIAL_CONFIG } from '../../utils/celestialConfig';
 
 interface Star {
   x: number;
@@ -102,12 +102,7 @@ const CONSTELLATIONS: { name: string; stars: [number, number][] }[] = [
 
 const TWO_PI = Math.PI * 2;
 
-export const CELESTIAL_CONFIG = {
-  angularSpeed: 0.000075,
-  radialSpeed: 0.012,
-  motionBlurMinSpeed: 0.002,
-  motionBlurLengthFactor: 1.0,
-};
+export { CELESTIAL_CONFIG };
 
 /**
  * Pre-render offscreen canvas star sprites for hardware-accelerated drawImage blitting
@@ -173,10 +168,6 @@ function createStarSprites() {
 export default function StarlightBackground() {
   const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    return initRadiansSync();
-  }, []);
 
   useEffect(() => {
     if (theme !== 'starlight') return;

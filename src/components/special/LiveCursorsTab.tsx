@@ -165,7 +165,7 @@ export default function LiveCursorsTab({ visitorId, activeSlug, onJumpToPeer }: 
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 text-[10px] shrink-0">
+        <div className="flex flex-wrap items-center gap-1.5 text-[10px] w-full sm:w-auto min-w-0">
           <button
             type="button"
             onClick={handleToggleGlobal}
@@ -238,9 +238,9 @@ export default function LiveCursorsTab({ visitorId, activeSlug, onJumpToPeer }: 
       </div>
 
       {/* True Vertical Split: Left 50% Compact Controls | Right 50% Full-Height Active Cursors Roster */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-2.5 overflow-y-auto lg:overflow-hidden pr-0.5 lg:pr-0">
         {/* LEFT HALF (50% Vertical): Compact Specimen, Size Slider, Cursor Design & Personal Trail Color */}
-        <div className="min-h-0 overflow-y-auto flex flex-col gap-2 pr-0.5">
+        <div className="lg:min-h-0 lg:overflow-y-auto flex flex-col gap-2 lg:pr-0.5">
           {/* Specimen & Size Slider */}
           <div className="bg-[#0a0f0c] border border-[#18231a] rounded p-2.5 flex flex-col gap-2 shrink-0">
             <div className="flex items-center justify-between text-[10.5px] text-[#7c9480]">
@@ -255,7 +255,7 @@ export default function LiveCursorsTab({ visitorId, activeSlug, onJumpToPeer }: 
             </div>
 
             <div
-              className="relative h-14 rounded bg-[#060a08] border border-[#141e16] flex items-center justify-around px-3 select-none"
+              className="relative min-h-14 py-1.5 rounded bg-[#060a08] border border-[#141e16] flex flex-wrap items-center justify-around gap-2 px-3 select-none"
               style={{
                 backgroundImage:
                   'radial-gradient(color-mix(in srgb, var(--ui-accent) 24%, transparent) 1px, transparent 1px)',
@@ -315,12 +315,12 @@ export default function LiveCursorsTab({ visitorId, activeSlug, onJumpToPeer }: 
             </div>
 
             <div className="flex flex-col gap-1.5 pt-0.5">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-[#e0e7e0]">
                   <Scaling className="w-3 h-3 text-emerald-400" />
                   <span>Size</span>
                 </span>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   {SIZE_PRESETS.map((preset) => {
                     const isActive = cursorSize === preset.size;
                     return (
@@ -491,8 +491,8 @@ export default function LiveCursorsTab({ visitorId, activeSlug, onJumpToPeer }: 
         </div>
 
         {/* RIGHT HALF (50% Vertical): Prioritized Full-Height Active Cursors Across Wiki */}
-        <div className="min-h-[300px] lg:min-h-0 bg-[#0a0f0c] border border-[#18231a] rounded p-3 flex flex-col gap-2">
-          <div className="flex items-center justify-between border-b border-[#18231a] pb-2 shrink-0">
+        <div className="min-h-[260px] lg:min-h-0 bg-[#0a0f0c] border border-[#18231a] rounded p-3 flex flex-col gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-1.5 border-b border-[#18231a] pb-2 shrink-0">
             <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#e0e7e0]">
               <Users className="w-3.5 h-3.5 text-emerald-400" />
               Active Cursors Across Wiki

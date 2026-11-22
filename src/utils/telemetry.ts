@@ -82,9 +82,13 @@ export async function trackTelemetryClick(options: ClickTrackingOptions | string
 
     // Live Firebase Firestore logging with dynamic imports
     try {
-      const { hasConfig, db } = await import('../lib/firebase');
+      const [{ hasConfig }, { getFirebaseDb }, { doc, setDoc, addDoc, collection, increment, serverTimestamp }] = await Promise.all([
+        import('../lib/firebaseConfig'),
+        import('../lib/firebaseDb'),
+        import('firebase/firestore'),
+      ]);
+      const db = hasConfig ? await getFirebaseDb() : null;
       if (hasConfig && db) {
-        const { doc, setDoc, addDoc, collection, increment, serverTimestamp } = await import('firebase/firestore');
         const statsDocRef = doc(db, 'stats', 'global');
         const statsWrite = setDoc(statsDocRef, {
           totalCount: increment(1),
@@ -156,9 +160,13 @@ export async function trackHoneyProbe(options: HoneyLogOptions) {
     const shortVisitorId = visitorId.substring(0, 12);
     const clientEnv = detectClientEnvironment();
 
-    const { hasConfig, db } = await import('../lib/firebase');
+    const [{ hasConfig }, { getFirebaseDb }, { addDoc, collection, serverTimestamp }] = await Promise.all([
+      import('../lib/firebaseConfig'),
+      import('../lib/firebaseDb'),
+      import('firebase/firestore'),
+    ]);
+    const db = hasConfig ? await getFirebaseDb() : null;
     if (hasConfig && db) {
-      const { addDoc, collection, serverTimestamp } = await import('firebase/firestore');
       const writePromise = addDoc(collection(db, 'honey_logs'), {
         timestamp: serverTimestamp(),
         visitorId: shortVisitorId,

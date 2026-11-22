@@ -1,25 +1,11 @@
 import React from 'react';
 import {
-  Cpu,
   ShieldCheck,
   Tag,
   Server
 } from 'lucide-react';
-import UpdatedFrame from '../UpdatedFrame';
 
 export default function TechnicalView() {
-  const modMetadata = [
-    { label: 'Mod ID', value: 'super_bonemeal' },
-    { label: 'Display Name', value: 'Super Bonemeal' },
-    { label: 'Mod Version', value: '1.4.0' },
-    { label: 'Minecraft Version', value: '1.21.1' },
-    { label: 'NeoForge Requirement', value: '[21.1.232,)' },
-    { label: 'Java Loader', value: 'javafml [4,)' },
-    { label: 'Data/Resource Pack Format', value: '48' },
-    { label: 'License', value: 'GNU General Public License v3 (GPLv3)' },
-    { label: 'Authors', value: 'MCreator, honeypie_3301' }
-  ];
-
   const compatibilityTags = [
     {
       tag: 'minecraft:moss_block',
@@ -50,24 +36,6 @@ export default function TechnicalView() {
 
   return (
     <div className="space-y-8 max-w-[1000px] mx-auto text-ink-muted select-text">
-
-      {/* Mod Manifest Specs */}
-      <UpdatedFrame id="sb_technical_manifest" isUpdated={true}>
-        <div className="p-6 bg-surface border border-line rounded-xl space-y-5">
-          <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-accent-text font-semibold">
-            <Cpu className="w-4 h-4" />
-            <span>neoforge.mods.toml &amp; pack.mcmeta</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {modMetadata.map((item) => (
-              <div key={item.label} className="p-3.5 bg-surface-alt border border-line rounded-lg">
-                <div className="text-[10px] font-mono text-ink-subtle uppercase tracking-wider">{item.label}</div>
-                <div className="text-xs font-mono font-semibold text-ink mt-1">{item.value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </UpdatedFrame>
 
       {/* Block Tag & Cross-Mod Compatibility */}
       <div className="p-6 bg-surface border border-line rounded-xl space-y-4">

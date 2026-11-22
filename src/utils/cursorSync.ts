@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
-import { db, hasConfig, firebaseConfigDetails } from '../lib/firebase';
+import type { Firestore } from 'firebase/firestore';
+import { hasConfig, firebaseConfigDetails } from '../lib/firebaseConfig';
 import { detectClientEnvironment } from './deviceInfo';
 import { CursorStyleId, normalizeCursorStyle } from '../components/special/MacOsCursorSvg';
 import {
@@ -148,8 +148,49 @@ export function isDesktopPointerCapable(): boolean {
 
 const WIKI_ROOM_PREFIX = 'super_bonemeal';
 
+function sanitizeSlug(slug: string): string {
+  return (slug || 'home').toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
+}
+
 function getRoomDocId(slug: string): string {
   return `cursors_room_${WIKI_ROOM_PREFIX}_${sanitizeSlug(slug)}`;
+}
+
+type FirestoreCursorModule = {
+  db: Firestore;
+  collection: typeof import('firebase/firestore').collection;
+  doc: typeof import('firebase/firestore').doc;
+  onSnapshot: typeof import('firebase/firestore').onSnapshot;
+  setDoc: typeof import('firebase/firestore').setDoc;
+  updateDoc: typeof import('firebase/firestore').updateDoc;
+};
+
+let firestoreCursorMod: FirestoreCursorModule | null = null;
+let firestoreCursorPromise: Promise<FirestoreCursorModule | null> | null = null;
+
+function ensureFirestoreCursorModule(): Promise<FirestoreCursorModule | null> {
+  if (!hasConfig) return Promise.resolve(null);
+  if (firestoreCursorMod) return Promise.resolve(firestoreCursorMod);
+  if (!firestoreCursorPromise) {
+    firestoreCursorPromise = Promise.all([
+      import('../lib/firebaseDb').then((m) => m.getFirebaseDb()),
+      import('firebase/firestore'),
+    ])
+      .then(([db, fs]) => {
+        if (!db) return null;
+        firestoreCursorMod = {
+          db,
+          collection: fs.collection,
+          doc: fs.doc,
+          onSnapshot: fs.onSnapshot,
+          setDoc: fs.setDoc,
+          updateDoc: fs.updateDoc,
+        };
+        return firestoreCursorMod;
+      })
+      .catch(() => null);
+  }
+  return firestoreCursorPromise;
 }
 
 // Singleton live state
@@ -811,27 +852,30 @@ async function probeAndConnectWebSocket() {
 }
 
 function subscribeFirestoreConfig() {
-  if (!hasConfig || !db || unsubscribeConfigSnap) return;
-  try {
-    const configRef = doc(db, 'stats', 'cursors_control');
-    unsubscribeConfigSnap = onSnapshot(
-      configRef,
-      (snap) => {
-        transportStatus.firestoreConnected = true;
-        notifyTransportListeners();
-        if (snap.exists()) {
-          const data = snap.data() as Partial<CursorsGlobalConfig>;
-          if (typeof data.enabled === 'boolean') {
-            applyConfigLocally(data, true);
+  if (!hasConfig || unsubscribeConfigSnap) return;
+  void ensureFirestoreCursorModule().then((fsMod) => {
+    if (!fsMod || !isEngineStarted || unsubscribeConfigSnap) return;
+    try {
+      const configRef = fsMod.doc(fsMod.db, 'stats', 'cursors_control');
+      unsubscribeConfigSnap = fsMod.onSnapshot(
+        configRef,
+        (snap) => {
+          transportStatus.firestoreConnected = true;
+          notifyTransportListeners();
+          if (snap.exists()) {
+            const data = snap.data() as Partial<CursorsGlobalConfig>;
+            if (typeof data.enabled === 'boolean') {
+              applyConfigLocally(data, true);
+            }
           }
+        },
+        () => {
+          transportStatus.firestoreConnected = false;
+          notifyTransportListeners();
         }
-      },
-      () => {
-        transportStatus.firestoreConnected = false;
-        notifyTransportListeners();
-      }
-    );
-  } catch {}
+      );
+    } catch {}
+  });
 }
 
 function subscribeFirestoreRoom(slug: string) {
@@ -839,48 +883,55 @@ function subscribeFirestoreRoom(slug: string) {
     unsubscribeRoomSnap();
     unsubscribeRoomSnap = null;
   }
-  if (!hasConfig || !db) return;
+  if (!hasConfig) return;
 
-  try {
-    const roomDocId = getRoomDocId(slug);
-    const roomRef = doc(db, 'stats', roomDocId);
-    unsubscribeRoomSnap = onSnapshot(
-      roomRef,
-      (snap) => {
-        transportStatus.firestoreConnected = true;
-        notifyTransportListeners();
-        if (!snap.exists()) return;
-        const data = snap.data() as { cursors?: Record<string, RemoteCursorData> };
-        const cursorsMap = data?.cursors;
-        if (!cursorsMap || typeof cursorsMap !== 'object') return;
+  void ensureFirestoreCursorModule().then((fsMod) => {
+    if (!fsMod || !isEngineStarted || activeSlug !== slug) return;
+    if (unsubscribeRoomSnap) {
+      unsubscribeRoomSnap();
+      unsubscribeRoomSnap = null;
+    }
+    try {
+      const roomDocId = getRoomDocId(slug);
+      const roomRef = fsMod.doc(fsMod.db, 'stats', roomDocId);
+      unsubscribeRoomSnap = fsMod.onSnapshot(
+        roomRef,
+        (snap) => {
+          transportStatus.firestoreConnected = true;
+          notifyTransportListeners();
+          if (!snap.exists()) return;
+          const data = snap.data() as { cursors?: Record<string, RemoteCursorData> };
+          const cursorsMap = data?.cursors;
+          if (!cursorsMap || typeof cursorsMap !== 'object') return;
 
-        const now = Date.now();
-        const activeIdsInSnapshot = new Set<string>();
+          const now = Date.now();
+          const activeIdsInSnapshot = new Set<string>();
 
-        for (const [sid, c] of Object.entries(cursorsMap)) {
-          if (!c || typeof c !== 'object' || sid === LOCAL_SESSION_ID) continue;
-          if (!c.active || now - Number(c.ts || 0) > STALE_CURSOR_MS) {
-            removeRemoteCursor(sid, slug);
-          } else {
-            activeIdsInSnapshot.add(sid);
-            ingestRemoteCursor({ ...c, sessionId: sid, slug }, 'firestore');
+          for (const [sid, c] of Object.entries(cursorsMap)) {
+            if (!c || typeof c !== 'object' || sid === LOCAL_SESSION_ID) continue;
+            if (!c.active || now - Number(c.ts || 0) > STALE_CURSOR_MS) {
+              removeRemoteCursor(sid, slug);
+            } else {
+              activeIdsInSnapshot.add(sid);
+              ingestRemoteCursor({ ...c, sessionId: sid, slug }, 'firestore');
+            }
           }
-        }
 
-        // Fade out any cursor from Firestore source that vanished cleanly
-        for (const [sid, existing] of remoteCursors.entries()) {
-          if (existing.slug === slug && !existing.leaving && !activeIdsInSnapshot.has(sid) && now - existing.ts > 2000 && !transportStatus.wsConnected) {
-            scheduleCursorFadeOut(sid);
+          // Fade out any cursor from Firestore source that vanished cleanly
+          for (const [sid, existing] of remoteCursors.entries()) {
+            if (existing.slug === slug && !existing.leaving && !activeIdsInSnapshot.has(sid) && now - existing.ts > 2000 && !transportStatus.wsConnected) {
+              scheduleCursorFadeOut(sid);
+            }
           }
+          notifyFrameListeners();
+          notifyRosterListeners();
+        },
+        () => {
+          // Keep silent if offline
         }
-        notifyFrameListeners();
-        notifyRosterListeners();
-      },
-      () => {
-        // Keep silent if offline
-      }
-    );
-  } catch {}
+      );
+    } catch {}
+  });
 }
 
 function buildLocalPayload(
@@ -931,11 +982,11 @@ function buildLocalPayload(
 }
 
 function sendFirestoreCursorPayload(payload: RemoteCursorData, targetSlug = payload.slug) {
-  if (!hasConfig || !db) return;
+  if (!hasConfig || !firestoreCursorMod) return;
   try {
     const roomDocId = getRoomDocId(targetSlug);
-    const roomRef = doc(db, 'stats', roomDocId);
-    void setDoc(
+    const roomRef = firestoreCursorMod.doc(firestoreCursorMod.db, 'stats', roomDocId);
+    void firestoreCursorMod.setDoc(
       roomRef,
       {
         cursors: {
@@ -1025,10 +1076,10 @@ export function initCursorSync(initialSlug = 'home'): () => void {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'cursor:update', cursor: payload }));
     }
-    if (hasConfig && db) {
+    if (hasConfig && firestoreCursorMod) {
       const roomDocId = getRoomDocId(activeSlug);
-      const roomRef = doc(db, 'stats', roomDocId);
-      void updateDoc(roomRef, {
+      const roomRef = firestoreCursorMod.doc(firestoreCursorMod.db, 'stats', roomDocId);
+      void firestoreCursorMod.updateDoc(roomRef, {
         [`cursors.${LOCAL_SESSION_ID}.ts`]: now,
         [`cursors.${LOCAL_SESSION_ID}.active`]: true,
       }).catch(() => {
@@ -1365,11 +1416,14 @@ export function broadcastCursorConfigUpdate(
     ws.send(JSON.stringify({ type: 'cursors:config', config: updated }));
   }
 
-  if (hasConfig && db) {
-    try {
-      const configRef = doc(db, 'stats', 'cursors_control');
-      void setDoc(configRef, updated, { merge: true }).catch(() => {});
-    } catch {}
+  if (hasConfig) {
+    void ensureFirestoreCursorModule().then((fsMod) => {
+      if (!fsMod) return;
+      try {
+        const configRef = fsMod.doc(fsMod.db, 'stats', 'cursors_control');
+        void fsMod.setDoc(configRef, updated, { merge: true }).catch(() => {});
+      } catch {}
+    });
   }
 }
 
@@ -1646,50 +1700,53 @@ function startTelemetryPresenceStream() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify({ type: 'cursor:subscribe_all', enabled: true }));
   }
-  if (hasConfig && db && !unsubscribeGlobalRoomsSnap) {
-    try {
-      unsubscribeGlobalRoomsSnap = onSnapshot(
-        collection(db, 'stats'),
-        (querySnap) => {
-          if (telemetryWatcherCount <= 0) return;
-          const now = Date.now();
-          const nextMap = new Map<string, RemoteCursorData>();
-          querySnap.forEach((docSnap) => {
-            const prefix = `cursors_room_${WIKI_ROOM_PREFIX}_`;
-            if (!docSnap.id.startsWith(prefix)) return;
-            const slug = docSnap.id.slice(prefix.length) || 'home';
-            const data = docSnap.data() as { cursors?: Record<string, RemoteCursorData> };
-            const cursorsMap = data?.cursors;
-            if (!cursorsMap || typeof cursorsMap !== 'object') return;
-            for (const [sid, c] of Object.entries(cursorsMap)) {
-              if (!c || typeof c !== 'object' || sid === LOCAL_SESSION_ID) continue;
-              if (c.active && now - Number(c.ts || 0) <= STALE_CURSOR_MS) {
-                nextMap.set(sid, {
-                  ...c,
-                  sessionId: sid,
-                  slug: c.slug || slug,
-                  leaving: false,
-                  color: c.color || getVisitorColor(c.visitorId || sid),
-                });
+  if (hasConfig && !unsubscribeGlobalRoomsSnap) {
+    void ensureFirestoreCursorModule().then((fsMod) => {
+      if (!fsMod || telemetryWatcherCount <= 0 || unsubscribeGlobalRoomsSnap) return;
+      try {
+        unsubscribeGlobalRoomsSnap = fsMod.onSnapshot(
+          fsMod.collection(fsMod.db, 'stats'),
+          (querySnap) => {
+            if (telemetryWatcherCount <= 0) return;
+            const now = Date.now();
+            const nextMap = new Map<string, RemoteCursorData>();
+            querySnap.forEach((docSnap) => {
+              const prefix = `cursors_room_${WIKI_ROOM_PREFIX}_`;
+              if (!docSnap.id.startsWith(prefix)) return;
+              const slug = docSnap.id.slice(prefix.length) || 'home';
+              const data = docSnap.data() as { cursors?: Record<string, RemoteCursorData> };
+              const cursorsMap = data?.cursors;
+              if (!cursorsMap || typeof cursorsMap !== 'object') return;
+              for (const [sid, c] of Object.entries(cursorsMap)) {
+                if (!c || typeof c !== 'object' || sid === LOCAL_SESSION_ID) continue;
+                if (c.active && now - Number(c.ts || 0) <= STALE_CURSOR_MS) {
+                  nextMap.set(sid, {
+                    ...c,
+                    sessionId: sid,
+                    slug: c.slug || slug,
+                    leaving: false,
+                    color: c.color || getVisitorColor(c.visitorId || sid),
+                  });
+                }
+              }
+            });
+            // Preserve any fresher live WS peer timestamps
+            for (const [sid, existing] of globalPeers.entries()) {
+              const snapPeer = nextMap.get(sid);
+              if (snapPeer && existing.ts > snapPeer.ts + 25) {
+                nextMap.set(sid, existing);
+              } else if (!snapPeer && transportStatus.wsConnected && now - existing.ts <= STALE_CURSOR_MS) {
+                nextMap.set(sid, existing);
               }
             }
-          });
-          // Preserve any fresher live WS peer timestamps
-          for (const [sid, existing] of globalPeers.entries()) {
-            const snapPeer = nextMap.get(sid);
-            if (snapPeer && existing.ts > snapPeer.ts + 25) {
-              nextMap.set(sid, existing);
-            } else if (!snapPeer && transportStatus.wsConnected && now - existing.ts <= STALE_CURSOR_MS) {
-              nextMap.set(sid, existing);
-            }
-          }
-          globalPeers.clear();
-          nextMap.forEach((v, k) => globalPeers.set(k, v));
-          notifyGlobalPresenceListeners(true);
-        },
-        () => {}
-      );
-    } catch {}
+            globalPeers.clear();
+            nextMap.forEach((v, k) => globalPeers.set(k, v));
+            notifyGlobalPresenceListeners(true);
+          },
+          () => {}
+        );
+      } catch {}
+    });
   }
 }
 
@@ -1775,6 +1832,28 @@ export function useAllRemotePeers(enabled: boolean): RemoteCursorData[] {
   }, [enabled]);
 
   return peers;
+}
+
+export function subscribePageOccupancy(
+  cb: (occupancy: Record<string, number>) => void
+): () => void {
+  const release = retainTelemetryPresence();
+  const compute = () => {
+    const next: Record<string, number> = {};
+    for (const p of snapshotAllRemotePeers()) {
+      const slug = p.slug || 'home';
+      next[slug] = (next[slug] || 0) + 1;
+    }
+    cb(next);
+  };
+  globalPresenceListeners.add(compute);
+  rosterListeners.add(compute);
+  compute();
+  return () => {
+    globalPresenceListeners.delete(compute);
+    rosterListeners.delete(compute);
+    release();
+  };
 }
 
 export function usePageOccupancy(enabled: boolean): Record<string, number> {

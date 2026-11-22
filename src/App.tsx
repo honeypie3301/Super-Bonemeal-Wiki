@@ -10,8 +10,6 @@ import { trackTelemetryClick, trackHoneyProbe } from './utils/telemetry';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
 import ThemeToggle from './components/ThemeToggle';
 import StarlightBackground from './components/special/StarlightBackground';
-import LiveCursorsOverlay from './components/special/LiveCursorsOverlay';
-import { usePageOccupancy } from './utils/cursorSync';
 import {
   hasPersistedTelemetryUnlockHint,
   getPersistedAdminToken,
@@ -22,6 +20,7 @@ import {
   clearPersistedAdminToken,
 } from './utils/telemetryAuth';
 
+const LiveCursorsOverlay = React.lazy(() => import('./components/special/LiveCursorsOverlay'));
 const StatsModal = React.lazy(() => import('./components/StatsModal'));
 
 function WikiContainer() {
@@ -42,8 +41,33 @@ function WikiContainer() {
   const [isTelemetryUnlocked, setIsTelemetryUnlocked] = useState<boolean>(() =>
     hasPersistedTelemetryUnlockHint()
   );
+  const [cursorsReady, setCursorsReady] = useState(false);
+  const [pageOccupancy, setPageOccupancy] = useState<Record<string, number>>({});
   const isTerminalAuthorizedRef = React.useRef(false);
-  const pageOccupancy = usePageOccupancy(isTelemetryUnlocked);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setCursorsReady(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  useEffect(() => {
+    if (!isTelemetryUnlocked || !cursorsReady) {
+      setPageOccupancy({});
+      return;
+    }
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    import('./utils/cursorSync').then(({ subscribePageOccupancy }) => {
+      if (cancelled) return;
+      unsubscribe = subscribePageOccupancy((next) => {
+        if (!cancelled) setPageOccupancy(next);
+      });
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
+  }, [isTelemetryUnlocked, cursorsReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,28 +115,44 @@ function WikiContainer() {
       void runTokenCheck(tok);
     });
 
-    void (async () => {
-      try {
-        const [{ onAuthStateChanged }, { auth }] = await Promise.all([
-          import('firebase/auth'),
-          import('./lib/firebase'),
-        ]);
-        if (cancelled) return;
-        unsubscribeFirebase = onAuthStateChanged(auth, (user) => {
+    const runFirebaseAuthCheck = () => {
+      void (async () => {
+        try {
+          const [{ onAuthStateChanged }, { auth }] = await Promise.all([
+            import('firebase/auth'),
+            import('./lib/firebaseAuth').then((m) => m.getFirebaseAuth()),
+          ]);
+          if (cancelled) return;
+          unsubscribeFirebase = onAuthStateChanged(auth, (user) => {
+            firebaseReady = true;
+            firebaseAuthed = isAuthorizedFirebaseUser(user);
+            recomputeUnlock();
+          });
+        } catch {
           firebaseReady = true;
-          firebaseAuthed = isAuthorizedFirebaseUser(user);
+          firebaseAuthed = false;
           recomputeUnlock();
-        });
-      } catch {
-        firebaseReady = true;
-        firebaseAuthed = false;
-        recomputeUnlock();
-      }
-    })();
+        }
+      })();
+    };
+
+    let idleHandle: number | null = null;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      idleHandle = (window as any).requestIdleCallback(runFirebaseAuthCheck);
+    } else {
+      timeoutHandle = setTimeout(runFirebaseAuthCheck, 1200);
+    }
 
     return () => {
       cancelled = true;
       unsubToken();
+      if (idleHandle !== null && typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+        (window as any).cancelIdleCallback(idleHandle);
+      }
+      if (timeoutHandle !== null) {
+        clearTimeout(timeoutHandle);
+      }
       unsubscribeFirebase?.();
     };
   }, []);
@@ -210,7 +250,11 @@ function WikiContainer() {
 
     const recordVisitFirebase = async (slug: string, visitorId: string): Promise<boolean> => {
       try {
-        const { hasConfig, db: firestoreDb } = await import('./lib/firebase');
+        const [{ hasConfig }, { getFirebaseDb }] = await Promise.all([
+          import('./lib/firebaseConfig'),
+          import('./lib/firebaseDb'),
+        ]);
+        const firestoreDb = hasConfig ? await getFirebaseDb() : null;
         if (!hasConfig || !firestoreDb) {
           return false;
         }
@@ -723,11 +767,15 @@ function WikiContainer() {
       </div>
 
       {/* Live Multiplayer Desktop Cursors Overlay (visible on desktop & non-desktop) */}
-      <LiveCursorsOverlay
-        activeSlug={activeSlug}
-        isTelemetryUnlocked={isTelemetryUnlocked}
-        onNavigateSlug={handleNavigateSlug}
-      />
+      {cursorsReady && (
+        <React.Suspense fallback={null}>
+          <LiveCursorsOverlay
+            activeSlug={activeSlug}
+            isTelemetryUnlocked={isTelemetryUnlocked}
+            onNavigateSlug={handleNavigateSlug}
+          />
+        </React.Suspense>
+      )}
 
       {/* Stats overlay terminal */}
       {statsOpen && (

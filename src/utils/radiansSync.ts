@@ -9,9 +9,8 @@
  * ========================================================================================
  */
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { db, hasConfig } from '../lib/firebase';
-import { CELESTIAL_CONFIG } from '../components/special/StarlightBackground';
+import { hasConfig } from '../lib/firebaseConfig';
+import { CELESTIAL_CONFIG } from './celestialConfig';
 
 export interface CelestialRadiansState {
   angularSpeed: number; // Angular velocity in radians per second
@@ -120,53 +119,63 @@ export function initRadiansSync(): () => void {
   }
 
   // Subscribe to central Firestore cluster under 'stats/radians_control'
-  if (hasConfig && db) {
-    try {
-      let hasReceivedInitialSnap = false;
-      const radiansDocRef = doc(db, 'stats', 'radians_control');
+  let cancelled = false;
+  if (hasConfig) {
+    void (async () => {
+      try {
+        const [db, { doc, onSnapshot }] = await Promise.all([
+          import('../lib/firebaseDb').then((m) => m.getFirebaseDb()),
+          import('firebase/firestore'),
+        ]);
+        if (cancelled || !db) return;
 
-      const channelTimeout = setTimeout(() => {
-        if (!hasReceivedInitialSnap && unsubscribeFirestore) {
-          unsubscribeFirestore();
-          unsubscribeFirestore = null;
-        }
-      }, 4000);
+        let hasReceivedInitialSnap = false;
+        const radiansDocRef = doc(db, 'stats', 'radians_control');
 
-      unsubscribeFirestore = onSnapshot(
-        radiansDocRef,
-        (snap) => {
-          hasReceivedInitialSnap = true;
-          clearTimeout(channelTimeout);
-          if (snap.exists()) {
-            const data = snap.data() as Partial<CelestialRadiansState>;
-            if (typeof data.angularSpeed === 'number') {
-              applyStateLocally(data, true);
-              try {
-                localStorage.setItem('wiki_radians_cache', JSON.stringify(currentRadiansState));
-              } catch {
-                // Ignore storage limits
-              }
-            }
-          } else {
-            // Document does not exist yet; keep DEFAULT_RADIANS_STATE locally without unauthenticated writes
-            applyStateLocally(DEFAULT_RADIANS_STATE, false);
-          }
-        },
-        () => {
-          clearTimeout(channelTimeout);
-          // Gracefully terminate hanging channel to prevent ERR_TIMED_OUT console errors
-          if (unsubscribeFirestore) {
+        const channelTimeout = setTimeout(() => {
+          if (!hasReceivedInitialSnap && unsubscribeFirestore) {
             unsubscribeFirestore();
             unsubscribeFirestore = null;
           }
-        }
-      );
-    } catch {
-      // Operating offline
-    }
+        }, 4000);
+
+        unsubscribeFirestore = onSnapshot(
+          radiansDocRef,
+          (snap) => {
+            hasReceivedInitialSnap = true;
+            clearTimeout(channelTimeout);
+            if (snap.exists()) {
+              const data = snap.data() as Partial<CelestialRadiansState>;
+              if (typeof data.angularSpeed === 'number') {
+                applyStateLocally(data, true);
+                try {
+                  localStorage.setItem('wiki_radians_cache', JSON.stringify(currentRadiansState));
+                } catch {
+                  // Ignore storage limits
+                }
+              }
+            } else {
+              // Document does not exist yet; keep DEFAULT_RADIANS_STATE locally without unauthenticated writes
+              applyStateLocally(DEFAULT_RADIANS_STATE, false);
+            }
+          },
+          () => {
+            clearTimeout(channelTimeout);
+            // Gracefully terminate hanging channel to prevent ERR_TIMED_OUT console errors
+            if (unsubscribeFirestore) {
+              unsubscribeFirestore();
+              unsubscribeFirestore = null;
+            }
+          }
+        );
+      } catch {
+        // Operating offline
+      }
+    })();
   }
 
   return () => {
+    cancelled = true;
     if (unsubscribeFirestore) {
       unsubscribeFirestore();
       unsubscribeFirestore = null;
@@ -233,8 +242,13 @@ export function broadcastRadiansUpdate(partial: Partial<CelestialRadiansState>, 
   }
 
   writeDebounceTimer = setTimeout(async () => {
-    if (!hasConfig || !db) return;
+    if (!hasConfig) return;
     try {
+      const [db, { doc, setDoc }] = await Promise.all([
+        import('../lib/firebaseDb').then((m) => m.getFirebaseDb()),
+        import('firebase/firestore'),
+      ]);
+      if (!db) return;
       const radiansDocRef = doc(db, 'stats', 'radians_control');
       await setDoc(radiansDocRef, updated, { merge: true });
     } catch (err) {

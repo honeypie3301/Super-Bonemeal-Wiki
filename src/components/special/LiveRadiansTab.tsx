@@ -368,12 +368,12 @@ export default function LiveRadiansTab({ visitorId }: LiveRadiansTabProps) {
 
             {/* Range Slider max 5.0 */}
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between text-[10px] text-[#637d68]">
-                <span>-5.000000 rad/s (Retrograde)</span>
+              <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-[#637d68]">
+                <span>-5.0 rad/s</span>
                 <span className="text-emerald-300 font-bold text-xs bg-[#060a08] px-2 py-0.5 rounded border border-[#18231a]">
                   {state.angularSpeed >= 0 ? '+' : ''}{state.angularSpeed.toFixed(6)} rad/s
                 </span>
-                <span>+5.000000 rad/s (Prograde)</span>
+                <span>+5.0 rad/s</span>
               </div>
               <input
                 type="range"
@@ -387,18 +387,18 @@ export default function LiveRadiansTab({ visitorId }: LiveRadiansTabProps) {
             </div>
 
             {/* Direct Value Input Form */}
-            <form onSubmit={handleManualInputSubmit} className="flex items-center gap-2 mt-1">
+            <form onSubmit={handleManualInputSubmit} className="flex flex-wrap items-center gap-2 mt-1">
               <span className="text-[10px] text-[#637d68] shrink-0">DIRECT INPUT (MAX 5):</span>
               <input
                 type="text"
                 value={inputSpeed}
                 onChange={(e) => setInputSpeed(e.target.value)}
                 placeholder="e.g. 5.0"
-                className="flex-1 bg-[#060a08] border border-[#1d2920] rounded px-2 py-1 text-xs text-emerald-300 font-mono focus:outline-none focus:border-emerald-500"
+                className="min-w-0 flex-1 bg-[#060a08] border border-[#1d2920] rounded px-2 py-1 text-xs text-emerald-300 font-mono focus:outline-none focus:border-emerald-500"
               />
               <button
                 type="submit"
-                className="px-2.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/80 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+                className="px-2.5 py-1 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/80 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors cursor-pointer shrink-0"
               >
                 APPLY LIVE
               </button>
@@ -497,7 +497,7 @@ export default function LiveRadiansTab({ visitorId }: LiveRadiansTabProps) {
 
             {/* Theme switcher banner if theme is not Starlight */}
             {theme !== 'starlight' && (
-              <div className="mt-1 p-2 bg-accent-soft border border-accent-border rounded flex items-center justify-between gap-2 text-[10px] text-accent-text">
+              <div className="mt-1 p-2 bg-accent-soft border border-accent-border rounded flex flex-wrap items-center justify-between gap-2 text-[10px] text-accent-text">
                 <span>
                   The background sky theme is currently set to{' '}
                   {theme === 'archival-dusk'
